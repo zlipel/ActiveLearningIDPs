@@ -3,6 +3,21 @@ import json
 import argparse
 
 def calculate_normalization_stats(features_file, output_file):
+    """Compute normalization statistics for feature scaling.
+
+    Parameters
+    ----------
+    features_file : str
+        Path to the CSV file containing raw features.
+    output_file : str
+        Destination for the JSON file with normalization parameters.
+
+    Side Effects
+    ------------
+    Writes a JSON file containing means, standard deviations and range
+    information used for later feature normalization.
+    """
+
     df_inp = pd.read_csv(features_file)
 
     features_df = df_inp.copy()

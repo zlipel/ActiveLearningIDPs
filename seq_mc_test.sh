@@ -1,4 +1,6 @@
 #!/bin/bash
+# Monte Carlo variant of the active learning generation script. It orchestrates
+# feature creation, label compilation and GA optimization with stochastic EHVI.
 #SBATCH --job-name=GA_iterkMC
 #SBATCH --output=master_gen_%j.out
 #SBATCH --error=master_gen_%j.err

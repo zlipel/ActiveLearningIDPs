@@ -4,6 +4,10 @@ from scipy.special import ndtr  # This is equivalent to the CDF of the normal di
 import torch
 import gpytorch
 
+# The module relies on numpy and SciPy's normal distribution utilities.
+import numpy as np
+from scipy.stats import norm
+
 def exipsi_vectorized(a, b, m, s):
     """
     Vectorized Ψ function for EHVI.
@@ -19,12 +23,34 @@ def exipsi_vectorized(a, b, m, s):
 
 
 def reference_point_on_IN_line(
-    pareto_Y: np.ndarray,          # shape (N,2) in ORIGINAL space (e.g. no sign flips)
-    front: str,    # e.g., 'upper' for max–max Pareto front, 'lower' for min–min Pareto front
-    k: float = 1.0,                       # scale for uncertainty-based step
-    cap_frac: float = 0.2,                # cap as fraction of ||I-N||
-    tau_fixed: float = 0.05         # used if not use_uncertainty
+    pareto_Y: np.ndarray,
+    front: str,
+    k: float = 1.0,
+    cap_frac: float = 0.2,
+    tau_fixed: float = 0.05,
 ):
+    """Compute a reference point slightly beyond the current Pareto front.
+
+    Parameters
+    ----------
+    pareto_Y : np.ndarray
+        Current Pareto front in original objective space.
+    front : str
+        Either ``"upper"`` for maximization or ``"lower"`` for minimization.
+    k : float, optional
+        Scale for uncertainty-based step.
+    cap_frac : float, optional
+        Maximum fraction of the ideal–nadir distance to step.
+    tau_fixed : float, optional
+        Fixed step fraction when uncertainty is not used.
+
+    Returns
+    -------
+    tuple
+        Reference point ``R`` and auxiliary data ``(I, N, u, L)`` describing
+        the ideal and nadir points and step geometry.
+    """
+
     Y = np.asarray(pareto_Y, float)
 
     # Ideal / Nadir in ORIGINAL space
@@ -65,8 +91,22 @@ def reference_point_on_IN_line(
 
 
 def front_augmentation(pareto_front, front, epsilons=None):
-    """ Method that augments the pareto front and orders it for ehvi calculation. Expecnts either upper or lower fronts. 
-    If we have upper front, we transform to thrid quadrant for minimization. If we have lower, we keep in first quadrant and augment appropriately."""
+    """Augment and orient the Pareto front for EHVI computation.
+
+    Parameters
+    ----------
+    pareto_front : array-like
+        Set of non-dominated objective pairs.
+    front : str
+        ``"upper"`` for max–max fronts, ``"lower"`` for min–min.
+    epsilons : tuple, optional
+        Optional epsilon adjustments for each objective.
+
+    Returns
+    -------
+    np.ndarray
+        Augmented front including reference points suitable for EHVI.
+    """
 
     # if epsilons is not None:
     #     pareto_front = np.array(pareto_front)

@@ -5,38 +5,53 @@ import numpy as np
 
 # Function to convert and normalize the features
 def convert_and_normalize_features(df_inp):
+    """Normalize raw feature DataFrame in-place.
+
+    Parameters
+    ----------
+    df_inp : pandas.DataFrame
+        Raw features where counts are absolute and lengths unscaled.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Normalized feature set where compositional features are expressed as
+        fractions and other descriptors are standardized.
+    """
+
     # Step 1: Convert features to proper form
     df = df_inp.copy()
-    # Convert counts to prevalence for amino acids (first 20 columns)
     for col in df.columns[:20]:
         df[col] = df[col] / df['length']
-    
+
     # Convert total charges to fractions
     df['beads(+)'] = df['beads(+)'] / df['length']
     df['beads(-)'] = df['beads(-)'] / df['length']
 
-    df['|net charge|'] = df['|net charge|']/df['length']
+    df['|net charge|'] = df['|net charge|'] / df['length']
 
-    df['sum lambda'] = df['sum lambda']/df['length']
+    df['sum lambda'] = df['sum lambda'] / df['length']
 
-    df['mol wt'] = df['mol wt']/df['length']
+    df['mol wt'] = df['mol wt'] / df['length']
+
     # Step 2: Normalize the features
-    # Standard normalization for most features
-    features_to_standard_normalize = ['beads(+)', 'beads(-)', 'sum lambda', 'mol wt', 'SHD', 'SCD', '|net charge|']
+    features_to_standard_normalize = [
+        'beads(+)', 'beads(-)', 'sum lambda', 'mol wt', 'SHD', 'SCD', '|net charge|'
+    ]
     for feature in features_to_standard_normalize:
         mean = df[feature].mean()
         std = df[feature].std()
         df[feature] = (df[feature] - mean) / std
-    
+
     # Min-max normalization for sequence length L
     min_L = df['length'].min()
     max_L = df['length'].max()
     df['length'] = (df['length'] - min_L) / (max_L - min_L)
-    
+
     # Normalize Shannon entropy S by maximum
     max_S = df['shan ent'].max()
     df['shan ent'] = df['shan ent'] / max_S - 1
-    
+
     return df
 
 # Function to load and prepare the dataset
@@ -90,14 +105,18 @@ def load_dataset(features_file, labels_file, label_column='B2', model=None):
         return features, labels
 
 class ProteinDataset(Dataset):
+    """Dataset wrapper for regression tasks on protein features."""
+
     def __init__(self, features, labels):
         self.features = features
         self.labels = labels
 
     def __len__(self):
+        """Number of samples in the dataset."""
         return len(self.features)
 
     def __getitem__(self, idx):
+        """Retrieve the feature vector and label for a given index."""
         return self.features[idx], self.labels[idx]
 
 def load_classification_dataset(features_file, labels_file, label_column='psp'):
@@ -134,12 +153,16 @@ def load_classification_dataset(features_file, labels_file, label_column='psp'):
     return dataset
 
 class ClassificationDataset(Dataset):
+    """Dataset wrapper for classification tasks on protein features."""
+
     def __init__(self, features, labels):
         self.features = features
         self.labels = labels
 
     def __len__(self):
+        """Number of samples in the dataset."""
         return len(self.features)
 
     def __getitem__(self, idx):
+        """Retrieve the feature vector and label for a given index."""
         return self.features[idx], self.labels[idx]

@@ -30,6 +30,25 @@ class GPRTrainer:
         self.likelihood.train()
     
     def train(self, train_dat, val_dat, test_loader=None, early_stop=True):
+        """Train the GP model.
+
+        Parameters
+        ----------
+        train_dat : tuple
+            Training features and labels.
+        val_dat : tuple or None
+            Validation features and labels. If ``None`` no validation is used.
+        test_loader : DataLoader, optional
+            Unused placeholder for compatibility.
+        early_stop : bool, optional
+            Whether to perform early stopping based on validation loss.
+
+        Returns
+        -------
+        dict
+            Training (and optionally validation) loss history.
+        """
+
         train_losses = []
         val_losses = []
         best_val_loss = float('inf')
@@ -106,14 +125,19 @@ class GPRTrainer:
             return {"train_losses": train_losses}
 
     def evaluate(self, val_x, val_y):
-        """
-        Evaluate the GPR model on a given dataset.
-        
-        Args:
-            data_loader (DataLoader): DataLoader for the evaluation data.
-        
-        Returns:
-            float: Mean squared error (MSE) over the evaluation dataset.
+        """Evaluate the model on validation data.
+
+        Parameters
+        ----------
+        val_x : torch.Tensor
+            Validation features.
+        val_y : torch.Tensor
+            Validation targets.
+
+        Returns
+        -------
+        float
+            Mean squared error of the predictions.
         """
         self.model.eval()
         self.likelihood.eval()
@@ -160,6 +184,8 @@ class MultitaskGPRTrainer:
         self.likelihood.train()
     
     def train(self, train_dat, val_dat, test_loader=None, early_stop=True):
+        """Train the multitask GP model with optional early stopping."""
+
         train_losses = []
         val_losses = []
         best_val_loss = float('inf')
@@ -236,15 +262,7 @@ class MultitaskGPRTrainer:
             return {"train_losses": train_losses}
 
     def evaluate(self, val_x, val_y):
-        """
-        Evaluate the GPR model on a given dataset.
-        
-        Args:
-            data_loader (DataLoader): DataLoader for the evaluation data.
-        
-        Returns:
-            float: Mean squared error (MSE) over the evaluation dataset.
-        """
+        """Evaluate the multitask model on validation data."""
         self.model.eval()
         self.likelihood.eval()
         total_mse = 0.0

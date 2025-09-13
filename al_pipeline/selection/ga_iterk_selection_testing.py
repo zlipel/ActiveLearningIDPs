@@ -1,3 +1,5 @@
+"""Sequential GA candidate generation and EHVI evaluation."""
+
 import json
 import numpy as np
 import torch
@@ -9,7 +11,6 @@ import os
 from al_pipeline.models.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
 from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
 from al_pipeline.features.data_preprocessing import load_dataset
-# from utils.ehvi_2d import psi, ehvi_batch
 from . import ehvi
 from sklearn.model_selection import train_test_split
 from joblib import Parallel, delayed
@@ -42,31 +43,30 @@ atm_types = ['A',
 
 # convert string to a numpy array
 def AA2num(S, atm_types=atm_types):
-    # S is a string list
-    X = []
-    for i in S:
-        X.append(atm_types.index(i))
+    """Encode a sequence string into numeric indices."""
+    X = [atm_types.index(i) for i in S]
     return np.array(X)
 
+
 def back_AA(X, atm_types=atm_types):
+    """Decode numeric indices back to an amino acid string."""
     X = np.asarray(X)
-    AA_str=[]
-    for i in range(X.shape[0]):
-        AA_str.append(atm_types[int(X[i])])
+    AA_str = [atm_types[int(i)] for i in X]
     return ''.join(AA_str)
 
 
 def load_normalization_stats(file_path):
+    """Load feature normalization statistics from JSON."""
     with open(file_path, 'r') as f:
         return json.load(f)
 
 def standard_normalize_features(reshaped_features, normalization_stats):
+    """Normalize a raw feature vector using precomputed statistics."""
     std_normal_dict = normalization_stats['std_normal_dict']
     min_L = normalization_stats['min_L']
     max_L = normalization_stats['max_L']
     maxS = normalization_stats['maxS']
 
-    # Apply standard normalization based on the loaded stats (same as before)
     reshaped_features[:20] /= reshaped_features[20]
     reshaped_features[23] /= reshaped_features[20]
     reshaped_features[24] /= reshaped_features[20]

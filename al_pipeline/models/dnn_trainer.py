@@ -1,7 +1,7 @@
 import random
 import torch
 import torch.nn.functional as F
-from sklearn.model_selection import train_test_split,KFold
+from sklearn.model_selection import train_test_split, KFold
 import numpy as np
 import matplotlib.pyplot as plt
 from functools import wraps
@@ -21,7 +21,25 @@ def timing(f):
 
 
 class Trainer:
+    """Utility class for training feed-forward neural networks."""
+
     def __init__(self, model, optimizer_type='adam', learning_rate=0.001, epoch=100, batch_size=64):
+        """Configure the training procedure.
+
+        Parameters
+        ----------
+        model : torch.nn.Module
+            Neural network to optimize.
+        optimizer_type : str, optional
+            Either ``"adam"`` or ``"sgd"``.
+        learning_rate : float, optional
+            Optimizer learning rate.
+        epoch : int, optional
+            Number of training epochs.
+        batch_size : int, optional
+            Mini-batch size used during training.
+        """
+
         self.model = model
         if optimizer_type == "sgd":
             self.optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
@@ -34,6 +52,8 @@ class Trainer:
 
     @timing
     def train(self, train_loader, test_loader, early_stop=False, l2=False, silent=False, device='cpu', weight_cost=1e-5, draw_curve=False):
+        """Train the network and optionally plot loss curves."""
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else device)
         self.model.to(device)
 
@@ -91,16 +111,16 @@ class Trainer:
         return {"losses": losses, "val_losses": val_losses}
 
     def evaluate(self, test_loader):
+        """Compute loss on a validation or test set."""
 
         self.model.eval()
-        test_loss = 0.
+        test_loss = 0.0
 
         for feats, labels in test_loader:
-
-            feats  = feats.to(self.device)
+            feats = feats.to(self.device)
             labels = labels.to(self.device)
 
-            batch_importance = feats.size(0)/test_loader.batch_size
+            batch_importance = feats.size(0) / test_loader.batch_size
 
             with torch.no_grad():
                 out = self.model(feats)

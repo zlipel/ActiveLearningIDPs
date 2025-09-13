@@ -1,4 +1,6 @@
 #!/bin/bash
+# Execute genetic algorithm candidates with standard EHVI evaluation.
+# Tasks run in parallel, producing child sequences for the optimization loop.
 #SBATCH --job-name=GA_batch_run_iterk
 #SBATCH --output=logs/seq_num_%j.out
 #SBATCH --error=logs/seq_num_%j.err
