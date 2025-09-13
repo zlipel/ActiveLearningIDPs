@@ -6,90 +6,21 @@ import pandas as pd
 import argparse
 from time import time
 import os
-from TRAINING.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
-from geneticalgorithm_m2 import geneticalgorithm_batch as ga
-from UTILS.data_preprocessing_gpr import load_dataset
+from al_pipeline.models.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
+from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
+from al_pipeline.features.data_preprocessing import load_dataset
 # from utils.ehvi_2d import psi, ehvi_batch
-import UTILS.ehvi as ehvi
+from . import ehvi
 from sklearn.model_selection import train_test_split
 from joblib import Parallel, delayed
-import sequence_featurizer as sf
+from al_pipeline.features import sequence_featurizer as sf
 import pickle
 from sklearn.preprocessing import StandardScaler, PowerTransformer
 from pygmo import hypervolume
+from .utils import AA2num, back_AA, load_normalization_stats, standard_normalize_features
 
 
 
-atm_types = ['A',
- 'C',
- 'D',
- 'E',
- 'F',
- 'G',
- 'H',
- 'I',
- 'K',
- 'L',
- 'M',
- 'N',
- 'P',
- 'Q',
- 'R',
- 'S',
- 'T',
- 'V',
- 'W',
- 'Y']
-
-# convert string to a numpy array
-def AA2num(S, atm_types=atm_types):
-    # S is a string list
-    X = []
-    for i in S:
-        X.append(atm_types.index(i))
-    return np.array(X)
-
-def back_AA(X, atm_types=atm_types):
-    X = np.asarray(X)
-    AA_str=[]
-    for i in range(X.shape[0]):
-        AA_str.append(atm_types[int(X[i])])
-    return ''.join(AA_str)
-
-
-def load_normalization_stats(file_path):
-    with open(file_path, 'r') as f:
-        return json.load(f)
-
-def standard_normalize_features(reshaped_features, normalization_stats):
-    std_normal_dict = normalization_stats['std_normal_dict']
-    min_L = normalization_stats['min_L']
-    max_L = normalization_stats['max_L']
-    maxS = normalization_stats['maxS']
-
-    # Apply standard normalization based on the loaded stats (same as before)
-    reshaped_features[:20] /= reshaped_features[20]
-    reshaped_features[23] /= reshaped_features[20]
-    reshaped_features[24] /= reshaped_features[20]
-    reshaped_features[25] /= reshaped_features[20]
-    reshaped_features[26] /= reshaped_features[20]
-    reshaped_features[28] /= reshaped_features[20]
-
-    reshaped_features[20] = (reshaped_features[20] - min_L) / (max_L - min_L)
-
-    std_norm_indices = {
-        'SCD': 21, 'SHD': 22, '|net charge|': 23, 'sum lambda': 24,
-        'beads(+)': 25, 'beads(-)': 26, 'shannon_entropy': 27, 'mol wt': 28
-    }
-
-    for feat, idx in std_norm_indices.items():
-        if feat == 'shannon_entropy':
-            reshaped_features[idx] = reshaped_features[idx] / maxS - 1
-        else:
-            mean_val, std_val = std_normal_dict[feat]
-            reshaped_features[idx] = (reshaped_features[idx] - mean_val) / std_val
-
-    return reshaped_features
 
 
 def load_gpr_models(model_path, master_path, iteration, model_labels, ehvi_var, explore, seq_id, transform):
