@@ -45,7 +45,7 @@ mkdir -p "$LOG_DIR"
 
 for CAND_ID in {1..96}; do
     echo "Generating candidate $CAND_ID for child sequence $SEQ_ID in iteration $ITER..."
-    srun  -n 1 --exclusive python /home/zl4808/PROJECTS/MODEL_COMPARISON/ga_iterk_selection_testing.py \
+    srun  -n 1 --exclusive python -m al_pipeline.selection.ga_iterk_selection_testing \
         --gen_folder "$BASE_DIR" \
         --iter_folder "$ITERATION_DIR" \
         --iteration "$ITER" \
@@ -65,7 +65,7 @@ wait
 
 # Once all candidates are generated, select the best one
 echo "Selecting the best candidate for child sequence $SEQ_ID..."
-python /home/zl4808/PROJECTS/MODEL_COMPARISON/select_best_sequence.py \
+python -m al_pipeline.selection.select_best_sequence \
     --input_folder "$BASE_DIR/candidates_${EHVI}_${EXPLORE}_${TRANSFORM}" \
     --output_file "$CHILDREN_DIR/seq_child_${SEQ_ID}.txt" \
     --seq_id $SEQ_ID \
@@ -77,7 +77,7 @@ sleep 2
 
 if [[ "$EXPLORE" == "kriging_believer" || "$EXPLORE" == "constant_liar_min" || "$EXPLORE" == "constant_liar_max" || "$EXPLORE" == "constant_liar_mean" ]]; then
 
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/augment_features.py \
+    python -m al_pipeline.features.augment_features \
         --gen_folder "$BASE_DIR" \
         --iter_folder "$ITERATION_DIR" \
         --iteration "$ITER" \
@@ -90,7 +90,7 @@ if [[ "$EXPLORE" == "kriging_believer" || "$EXPLORE" == "constant_liar_min" || "
         --transform "$TRANSFORM" \
         
         
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/generate_parents.py \
+    python -m al_pipeline.selection.generate_parents \
         --features_path "$ITERATION_DIR/features_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}.csv" \
         --labels_path "$ITERATION_DIR/labels_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}.csv" \
         --output_path "$BASE_DIR" \
