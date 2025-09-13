@@ -4,8 +4,6 @@ import pandas as pd
 import os
 import argparse
 
-
-
 def main():
     # Define arguments and parse.
     parser = argparse.ArgumentParser(description='Generate label csv for sequences.')
