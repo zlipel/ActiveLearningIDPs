@@ -1,6 +1,8 @@
 import argparse
 
+
 def main():
+    """Collect child sequences and write them as GA candidates."""
     parser = argparse.ArgumentParser(description='Process child sequences and identify Pareto front.')
     parser.add_argument('--prev_iter_path', type=str, required=True, help='Path for previous iteration output.')
     parser.add_argument('--iter_path', type=str, required=True, help='Path for next iteration output.')

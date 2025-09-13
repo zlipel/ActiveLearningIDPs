@@ -5,6 +5,18 @@ import os
 import argparse
 
 def main():
+    """Merge simulation outputs into a single labels CSV.
+
+    Parameters are read from the command line to locate simulation results for
+    equation-of-state and diffusivity calculations. The resulting labels are
+    appended to previous iterations when provided.
+
+    Side Effects
+    ------------
+    Writes a CSV file containing all collected labels for the current
+    iteration.
+    """
+
     # Define arguments and parse.
     parser = argparse.ArgumentParser(description='Generate label csv for sequences.')
     parser.add_argument("--eos_path", type=str, required=True, help="Path to eos simulation results.")
