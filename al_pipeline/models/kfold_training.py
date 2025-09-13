@@ -1,24 +1,23 @@
 import os
-import sys
 
-# Add the parent directory to sys.path to allow importing from sibling folders
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
-
-# Import the GPR model
-from TRAINING.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
-from TRAINING.rf_model  import RandomForestClassifierModel
-from TRAINING.DNN_Model  import DNN
+# Import model definitions
+from .gpr_model import GPRegressionModel, MultitaskGPRegressionModel
+from .rf_model import RandomForestClassifierModel
+from .DNN_Model import DNN
 
 from sklearn.ensemble import RandomForestClassifier
 
-# Import the GPRTrainer class
-from TRAINING.gpr_trainer import GPRTrainer, MultitaskGPRTrainer
-from TRAINING.dnn_trainer import Trainer
+# Import the trainer classes
+from .gpr_trainer import GPRTrainer, MultitaskGPRTrainer
+from .dnn_trainer import Trainer
 
 # Import the data preprocessing functions
-from UTILS.data_preprocessing_gpr import load_dataset, ProteinDataset, load_classification_dataset, ClassificationDataset
+from al_pipeline.features.data_preprocessing import (
+    load_dataset,
+    ProteinDataset,
+    load_classification_dataset,
+    ClassificationDataset,
+)
 
 # Additional imports
 from sklearn.model_selection import KFold, train_test_split, GridSearchCV

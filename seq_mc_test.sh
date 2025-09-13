@@ -109,13 +109,13 @@ EOS_PATH="$ITERATION_DIR/SIMULATIONS/EOS/eos_results.csv"
 DIFF_PATH="$ITERATION_DIR/SIMULATIONS/DIFF/diffusivities.csv"
 
 if [[ $ITER -eq 0 ]]; then
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/generate_labels.py \
+    python -m al_pipeline.labels.generate_labels \
         --eos_path "/scratch/gpfs/zl4808/PROJECTS/MODEL_COMPARISON/$MODEL/SIMULATIONS/EOS/eos_results.csv" \
         --diff_path "/scratch/gpfs/zl4808/PROJECTS/MODEL_COMPARISON/$MODEL/SIMULATIONS/DIFF/diffusivities.csv" \
         --output_path "$ITERATION_DIR/labels_gen$ITER.csv" \
         --iter $ITER
 else
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/generate_labels.py \
+    python -m al_pipeline.labels.generate_labels \
         --eos_path "$EOS_PATH" \
         --diff_path "$DIFF_PATH" \
         --output_path "$ITERATION_DIR/labels_gen$ITER.csv" \
@@ -188,7 +188,7 @@ cp "${BASE_DIR}/sequences_parent_TEMP_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.txt" "$
 # Calculate Normalization Stats
 # -------------------------------
 echo "Calculating normalization statistics..."
-python /home/zl4808/PROJECTS/MODEL_COMPARISON/calculate_normalization_stats.py \
+python -m al_pipeline.features.calculate_normalization_stats \
     --features_file "$ITERATION_DIR/features_gen$ITER.csv" \
     --output_file "$ITERATION_DIR/normalization_stats.json"
 

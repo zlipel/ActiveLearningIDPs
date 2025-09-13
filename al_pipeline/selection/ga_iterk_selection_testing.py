@@ -6,17 +6,16 @@ import pandas as pd
 import argparse
 from time import time
 import os
-from TRAINING.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
-from geneticalgorithm_m2 import geneticalgorithm_batch as ga
-from UTILS.data_preprocessing_gpr import load_dataset
+from al_pipeline.models.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
+from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
+from al_pipeline.features.data_preprocessing import load_dataset
 # from utils.ehvi_2d import psi, ehvi_batch
-import UTILS.ehvi as ehvi
+from . import ehvi
 from sklearn.model_selection import train_test_split
 from joblib import Parallel, delayed
-import sequence_featurizer as sf
+from al_pipeline.features import sequence_featurizer as sf
 import pickle
 from sklearn.preprocessing import StandardScaler, PowerTransformer
-from pygmo import hypervolume
 
 
 
@@ -138,14 +137,14 @@ def load_gpr_models(model_path, master_path, iteration, model_labels, ehvi_var, 
         features, labels = load_dataset(features_file, \
                                                 labels_file, \
                                                     label_column=label)
-        if label == 'diff' and 'log' in transform:
+        if label == 'diff' and transform == 'log':
             # Convert diffusion coefficient to log scale
             labels = np.log(labels + 1e-8)
 
-        if 'yeoj' in transform:
+        if transform == 'yeoj':
             scaler = PowerTransformer(method='yeo-johnson')
             scaler.fit_transform(labels.reshape(-1,1))
-        elif 'log' in transform:
+        elif transform == 'log':
             scaler = StandardScaler()
         # Fit the scaler to the labels
             scaler.fit_transform(labels.reshape(-1, 1))
@@ -181,7 +180,7 @@ def load_gpr_models(model_path, master_path, iteration, model_labels, ehvi_var, 
         # Load the model and optimizer state dicts
     model.load_state_dict(checkpoint['model'])
     
-    return model, likelihood, scalers, features_norm, labels_norm
+    return model, likelihood, scalers, features_norm
 
 
 def alpha(sequences, propseqs, seq_id):
@@ -209,275 +208,10 @@ def alpha(sequences, propseqs, seq_id):
         full_matrix = np.where(full_matrix == 0, 1e-6, full_matrix) ** (-1)
 
         return (seq_id - 1)/np.sum(full_matrix, axis=1) # similarity penalty per candidate,
-
-def minmax_scale(X, ref_min=None, ref_max=None):
-    if ref_min is None:
-        ref_min = np.min(X, axis=0)
-    if ref_max is None:
-        ref_max = np.max(X, axis=0)
-    return (X - ref_min) / (ref_max - ref_min), ref_min, ref_max
-
-def dominates(sol1, sol2, kind = ['max', 'max']):
-    """
-    Check if sol1 dominates sol2 for maximizing D and minimizing B2.
-    """
-    obj1 = kind[0]
-    obj2 = kind[1]
-
-    if obj1 == 'min':
-        if obj2 == 'max':
-            return (sol1[0] <= sol2[0] and sol1[1] >= sol2[1]) and (sol1[0] < sol2[0] or sol1[1] > sol2[1])
-        elif obj2 == 'min':
-            return (sol1[0] <= sol2[0] and sol1[1] <= sol2[1]) and (sol1[0] < sol2[0] or sol1[1] < sol2[1])
-    elif obj1 == 'max':
-        if obj2 == 'min':
-            return (sol1[0] >= sol2[0] and sol1[1] <= sol2[1]) and (sol1[0] > sol2[0] or sol1[1] < sol2[1])
-        elif obj2 == 'max':
-            return (sol1[0] >= sol2[0] and sol1[1] >= sol2[1]) and (sol1[0] > sol2[0] or sol1[1] > sol2[1])
-    else:   
-        raise ValueError("Invalid objective types.")
-    
-def filter_nondominated(points):
-    """
-    Returns a boolean mask of nondominated points (for minimization).
-    """
-    num_points = points.shape[0]
-    is_efficient = np.ones(num_points, dtype=bool)
-    
-    for i in range(num_points):
-        for j in range(num_points):
-            if i == j:
-                continue
-            # Check if point j dominates point i
-            if dominates(points[j], points[i], kind=['min', 'min']):
-                is_efficient[i] = False
-                break  # No need to check others
-    return is_efficient
-
-def refpoint(pareto_front, front = 'upper'):
-    """
-    Calculate the reference point for the hypervolume calculation based on the Pareto front.
-    
-    Args:
-        pareto_front: Numpy array of the Pareto front values in the shape of [N, 2] where N is the number of sequences.
-        front: 'upper' or 'lower' Pareto front.
         
-    Returns:
-        Reference point as a tuple (rB, rD).
-    """
-    minB = np.min(pareto_front[:,0])
-    minD = np.min(pareto_front[:,1])
-
-    maxB = np.max(pareto_front[:,0])
-    maxD = np.max(pareto_front[:,1])
-
-    if front =='upper':
-        rB = minB - 0.5*np.abs(minB)
-        rD = minD - 0.5*np.abs(minD)
-        return np.array([-1*rB, -1*rD])
-    elif front == 'lower':
-        rB = maxB + 0.5*np.abs(maxB)
-        rD = maxD + 0.5*np.abs(maxD)
-        return np.array([rB, rD])
-    else:
-        raise ValueError("Invalid front type. Choose 'upper' or 'lower'.") 
-
-def make_ref_point_min_space(pmin, margin=0.15):  # try 0.15–0.30 early on
-    worst = pmin.max(axis=0)                    # component-wise worst (min-space)
-    span  = pmin.max(axis=0) - pmin.min(axis=0)
-    r = worst + margin * np.maximum(span, 1e-9)
-    return r
 
 
-# def monte_carlo_ehvi_batch(candidate_tensor, model, pareto_front, ref_point, base_hv, n_samples=128, front='upper'):
-#     """
-#     Compute EHVI via Monte Carlo for a batch of candidates using a multi-task GPR.
-#     """
-#     B = candidate_tensor.size(dim=0)
-
-#     ehvi_vals = np.zeros(B)
-
-#     threshold = 50
-#     max_iter = 20
-
-#     iter = 0
-#     enough = True
-#     # while enough == True or iter < max_iter:
-
-#     posterior = model(candidate_tensor)
-#     samples = posterior.rsample(torch.Size([n_samples]))  # shape (n_samples, B, 2)
-
-#     for i in range(B):
-#         improvements = []
-#         for j in range(n_samples):
-#             sample_point = samples[j, i, :].detach().cpu().numpy()
-
-#             if front == 'upper':
-#                 sample_point *= -1
-
-#             # Quick dominance check
-#             if any(dominates(p, sample_point, kind=['min', 'min']) for p in pareto_front):
-#                 improvements.append(0.0)
-#                 continue
-
-#             # if sample is outside the bounded region, skip it and don't count it to hvolume:
-#             if np.any(sample_point > ref_point):
-#                 continue
-            
-
-#             extended_front = np.vstack([pareto_front, sample_point])
-#             nd_mask = filter_nondominated(extended_front)
-#             nd_front = extended_front[nd_mask]
-#             hv = hypervolume(nd_front).compute(ref_point)
-#             improvements.append(hv - base_hv)
-
-    
-#         if len(improvements) < threshold:
-#             #enough = False
-#             ehvi_vals[i] = 0.0
-#         else:
-#             ehvi_vals[i] = np.mean(improvements)
-            
-
-#     return ehvi_vals
-
-
-def monte_carlo_ehvi_batch_adaptive(candidate_tensor, model, pareto_front, ref_point, base_hv, 
-                            min_samples=64, 
-                            max_samples=512,
-                            chunk_size=128,
-                            stderr_tol=1e-4,
-                            front='upper'):
-    """
-    Compute EHVI via Monte Carlo for a batch of candidates using a multi-task GPR.
-    """
-    B = candidate_tensor.size(dim=0)
-    improvements = [[] for _ in range(B)]  # List of lists to store improvements for each candidate
-
-    ehvi_vals = np.zeros(B)
-
-    threshold = 50
-    max_iter = 20
-
-    iter = 0
-    enough = True
-    # while enough == True or iter < max_iter:
-
-    drawn = np.zeros(B, dtype=int)
-    done = np.zeros(B, dtype=bool)
-    total = 0
-
-    with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        posterior = model(candidate_tensor)
-
-    while not np.all(done) and total < max_samples:
-
-        S = min(chunk_size, max_samples - total)
-        with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            samples = posterior.rsample(torch.Size([S]))  # shape (n_samples, B, 2)
-        s_np = samples.detach().cpu().numpy()
-
-        if front == 'upper':
-            s_np *= -1
-
-        for i in range(B):
-            
-            if done[i]:
-                continue
-
-            for s in s_np[:, i, :]:
-    
-
-                if np.any(s >= ref_point) or any(dominates(p, s, kind=['min', 'min']) for p in pareto_front):
-                    improvements[i].append(0.0)
-                    continue
-                
-
-                extended_front = np.vstack([pareto_front, s])
-                nd_mask = filter_nondominated(extended_front)
-                nd_front = extended_front[nd_mask]
-                hv = hypervolume(nd_front).compute(ref_point)
-                improvements[i].append(hv - base_hv)
-
-            drawn[i] +=  S
-            if drawn[i] >= min_samples:
-                arr = np.asarray(improvements[i])
-                stderr = arr.std(ddof=1) / np.sqrt(arr.size) if arr.size > 1 else np.inf
-                if stderr < stderr_tol:
-                    done[i] = True
-
-
-        total += S
-
-    for i in range(B):
-        ehvi_vals[i] = np.mean(improvements[i]) if len(improvements[i]) > 0 else 0.0
-                
-    return ehvi_vals
-
-def monte_carlo_ehvi_batch(candidate_tensor, model, pareto_front, ref_point, base_hv,
-                           front='upper', min_samples=64, max_samples=548, stderr_tol=1e-3):
-    """
-    Compute EHVI via adaptive Monte Carlo for a batch of candidates using a multi-task GPR.
-
-    Args:
-        candidate_tensor (Tensor): (B, D) tensor of input features
-        model: GPyTorch multi-task GP model
-        pareto_front (ndarray): Current Pareto front, shape (N, 2)
-        ref_point (ndarray): Reference point for HV computation
-        base_hv (float): HV of current Pareto front
-        front (str): 'upper' or 'lower'
-        min_samples (int): Minimum MC samples
-        max_samples (int): Max MC samples per candidate
-        stderr_tol (float): Tolerance for standard error of EHVI estimate
-
-    Returns:
-        ehvi_vals (ndarray): EHVI estimates for each candidate, shape (B,)
-    """
-    B = candidate_tensor.size(0)
-    ehvi_vals = np.zeros(B)
-
-    with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        posterior = model(candidate_tensor)
-
-    for i in range(B):
-        improvements = []
-        sample_count = 0
-        converged = False
-
-        while not converged and sample_count < max_samples:
-            sample = posterior.rsample(torch.Size([1]))[0, i, :].detach().cpu().numpy()
-
-            if front == 'upper':
-                sample *= -1
-
-            if any(dominates(p, sample, kind=['min', 'min']) for p in pareto_front):
-                improvements.append(0.0)
-            elif np.any(sample >= ref_point):
-                continue
-            else:
-                extended_front = np.vstack([pareto_front, sample])
-                nd_mask = filter_nondominated(extended_front)
-                nd_front = extended_front[nd_mask]
-                hv = hypervolume(nd_front).compute(ref_point)
-                improvements.append(hv - base_hv)
-
-            sample_count += 1
-
-            if sample_count >= min_samples:
-                stderr = np.std(improvements) / np.sqrt(len(improvements))
-                if stderr < stderr_tol:
-                    converged = True
-
-        if len(improvements) < min_samples:
-            ehvi_vals[i] = 0.0
-        else:
-            ehvi_vals[i] = np.mean(improvements)
-
-    return ehvi_vals
-
-
-
-def fitness_function_batch(sequences, featurizer, pareto_input, hv_base, ref_point, gpr_model, normalization_stats, front):
+def fitness_function_batch(sequences, seq_id, featurizer, augmented_front, propseq_arr, gpr_model, likelihood, normalization_stats, front, exploration="similarity_penalty"):
     """
     Batch fitness function using the GPR model to predict B2 values for a list of sequences.
 
@@ -504,15 +238,52 @@ def fitness_function_batch(sequences, featurizer, pareto_input, hv_base, ref_poi
     # Convert all features to a tensor batch
     seq_tensor_batch = torch.tensor(seq_arr).float()
 
+    # Perform batch prediction using the GPR model
+    # with torch.no_grad(), gpytorch.settings.fast_pred_var():
+    #     pred_B2_batch, std_B2_batch     = likelihood(gpr_model(seq_tensor_batch)).mean[:,0], likelihood(gpr_model(seq_tensor_batch)).stddev[:,0]
+    #     pred_diff_batch, std_diff_batch = likelihood(gpr_model(seq_tensor_batch)).mean[:,1], likelihood(gpr_model(seq_tensor_batch)).stddev[:,1]
+
+
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        post = gpr_model(seq_tensor_batch)            # latent posterior over f
+        mu   = post.mean                              # shape [B, 2]
+        std  = post.stddev                            # shape [B, 2]  (sqrt of marginal variances)
+
+    pred_B2_batch   = mu[:, 0]
+    std_B2_batch    = std[:, 0]
+    pred_diff_batch = mu[:, 1]
+    std_diff_batch  = std[:, 1]
+
+    # reshape the predictions and standard deviations
+
+    pred_B2_reshaped   = pred_B2_batch.numpy().flatten() #.reshape(-1, 1)
+    pred_diff_reshaped = pred_diff_batch.numpy().flatten() #.reshape(-1, 1)
+
+    std_B2 = std_B2_batch.numpy().flatten() 
+    std_diff = std_diff_batch.numpy().flatten()
 
     ##### Calculate EHVI ####
-    ehvi_values = monte_carlo_ehvi_batch_adaptive(seq_tensor_batch, gpr_model, pareto_input, ref_point, hv_base,
-                            front=front)
 
-    if np.any(ehvi_values > 0.75):
-        print(f"EHVI values for sequences: {ehvi_values}", flush=True)
-
-    return  -1*ehvi_values # fitness function (minimize negative EHVI)
+    # ehvi calc
+    # rather than feeding in the -B2 vs D, we feed B2 vs -D in order to maximize the EHVI by doing the 
+    # equivalent minimization problem of B2 vs -D (maximizing -B2 vs D)
+    if front == 'lower':
+        ehvi_values = ehvi.ehvi_maximization(pred_B2_reshaped, std_B2, pred_diff_reshaped, std_diff, augmented_front)
+    elif front == 'upper':
+        ehvi_values = ehvi.ehvi_maximization(-pred_B2_reshaped, std_B2, -pred_diff_reshaped, std_diff, augmented_front)
+    else:
+        raise ValueError("Invalid front type. Choose 'upper' or 'lower'.")
+ 
+    #print(f"EHVI values for seq_id {seq_id}: {ehvi_values}", flush=True)
+    ##### Calculate similarity penalty using alpha ######
+    if seq_id > 1 and exploration == 'similarity_penalty':
+        alpha_values = alpha(seq_arr, propseq_arr, seq_id)  # Apply similarity penalty
+        #print(alpha_values, flush=True)
+    else:  
+        alpha_values = np.ones(len(pred_B2_reshaped))
+    #print(ehvi_values, flush=True)
+    # Return the inverse-transformed outputs as a list
+    return  -ehvi_values*alpha_values # fitness function (minimize negative EHVI)
 
 
 def load_pareto_front(master_path, iteration, columns, scalers, ehvi_variant, exploration, seq_id, transform):
@@ -547,7 +318,7 @@ def load_pareto_front(master_path, iteration, columns, scalers, ehvi_variant, ex
         return pareto_front, feats.values
 
 
-def save_cand_sequence(sequence, fitness, output_folder, cand_id, difference=None):
+def save_cand_sequence(sequence, fitness, output_folder, cand_id):
     """
     Save the candidate sequence as a text file with the specified candidate ID.
     
@@ -562,8 +333,6 @@ def save_cand_sequence(sequence, fitness, output_folder, cand_id, difference=Non
     with open(seq_file, 'w') as f:
         f.write(back_AA(sequence) + '\n')
         f.write(str(fitness) + '\n')
-        if difference is not None:
-            f.write(str(difference) + '\n')
 
 
 def main():
@@ -597,18 +366,26 @@ def main():
 
     objectives = [args.obj1, args.obj2]
 
-    transform = args.transform + '_MC' 
-
     # Load the GPR models and normalization stats
-    model, likelihood, scalers, feats_tensor, labels_norm = load_gpr_models(args.model_path, args.iter_folder, args.iteration, objectives, args.ehvi_variant, args.exploration_strategy, args.seq_id, transform)
+    model, likelihood, scalers, feats_tensor = load_gpr_models(args.model_path, args.iter_folder, args.iteration, objectives, args.ehvi_variant, args.exploration_strategy, args.seq_id, args.transform)
     normalization_stats = load_normalization_stats(os.path.join(args.iter_folder, f'normalization_stats.json'))
 
     model.eval()
     likelihood.eval()
 
+    #with torch.no_grad(), gpytorch.settings.fast_pred_var():
+    #    vars = likelihood(model(torch.tensor(feats_tensor).float())).variance.sqrt().numpy()
+    
+    #val1 = np.mean(vars[:,0]) if args.front == 'upper' else -np.mean(vars[:,0])
+    #val2 = np.mean(vars[:,1]) if args.front == 'upper' else -np.mean(vars[:,1])
+    #print(f"Epsilons for FULL DAT for seq {args.seq_id}, candidate {args.cand_id}: {(val1, val2)}", flush=True)
+
+
+    # # Load the RF model
+    # rf_model = joblib.load(args.model_path + f'/RF_psp_iter{args.iteration}.pkl')
 
     # Load parent sequences
-    seq_file = os.path.join(args.gen_folder, f'sequences_parent_TEMP_{args.ehvi_variant}_{args.exploration_strategy}_{transform}.txt') if args.seq_id > 1 and args.exploration_strategy not in ['standard', 'similarity_penalty'] \
+    seq_file = os.path.join(args.gen_folder, f'sequences_parent_TEMP_{args.ehvi_variant}_{args.exploration_strategy}_{args.transform}.txt') if args.seq_id > 1 and args.exploration_strategy not in ['standard', 'similarity_penalty'] \
         else os.path.join(args.gen_folder, 'sequences_parent.txt')
     with open(seq_file, 'r') as f:
         parent_seqs = [line.strip() for line in f]
@@ -619,7 +396,7 @@ def main():
         
     if args.seq_id > 1:
         for i in range(args.seq_id-1):
-            with open(os.path.join(args.gen_folder, f"children_{args.ehvi_variant}_{args.exploration_strategy}_{transform}", f"seq_child_{i+1}.txt"), 'r') as f:
+            with open(os.path.join(args.gen_folder, f"children_{args.ehvi_variant}_{args.exploration_strategy}_{args.transform}", f"seq_child_{i+1}.txt"), 'r') as f:
                 previous_candidates.append(f.readline().strip())
 
         previous_candidates = [list(AA2num(seq)) for seq in previous_candidates]  
@@ -637,29 +414,24 @@ def main():
     else:
         propseq_arr = previous_candidates
 
-    pareto_front, pareto_feats = load_pareto_front(args.gen_folder, args.iteration, objectives, scalers, args.ehvi_variant, args.exploration_strategy, args.seq_id, transform)
+    pareto_front, pareto_feats = load_pareto_front(args.gen_folder, args.iteration, objectives, scalers, args.ehvi_variant, args.exploration_strategy, args.seq_id, args.transform)
 
     pareto_input = np.zeros_like(pareto_front)
 
     if args.ehvi_variant == 'epsilon':
 
-
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             post = model(torch.tensor(pareto_feats).float())  # NOTE: model(...), not likelihood(model(...))
             std = post.stddev.cpu().numpy()                  # shape [N, 2], noise-free marginal stds
-            mmvn = post.to_data_independent_dist()
-            C = mmvn.lazy_covariance_matrix.to_dense().cpu().numpy()  # [N, 2, 2]
-        rho = C[:,0,1] / np.sqrt(C[:,0,0]*C[:,1,1])
-        print('avg rho:', np.mean(rho), 'median rho:', np.median(rho), flush=True)
 
         # mean (or median) uncertainty per objective along the front
         sigma_bar = np.median(std, axis=0)                     # shape (2,)  # use np.median for more robustness
 
         # direction: push towards the non-dominated region
-        sign = +1.0 if args.front == 'upper' else -1.0
+        sign = +2.0 if args.front == 'upper' else -2.0
 
         # scale: keep modest to avoid overshooting (which can yield EHVI ~ 0)
-        k = 0.75  # try 0.5–1.0 for MC-EHVI stability
+        k = 1.0  # try 0.5–1.0 for MC-EHVI stability
 
         # raw epsilon vector
         eps = sign * k * sigma_bar                           # shape (2,)
@@ -667,6 +439,8 @@ def main():
         # cap by a fraction of the front's span to prevent "unbeatable" pushes
         span = np.ptp(pareto_front, axis=0).clip(min=1e-12)  # per-objective range
         cap  = 0.2 * span                                    # 20% cap; tune 0.1–0.3
+        print(f"Span for PARETO FRONT for seq {args.seq_id}, candidate {args.cand_id}: {(span)}", flush=True)
+        print(f"Raw epsilons for PARETO FRONT for seq {args.seq_id}, candidate {args.cand_id}: {(eps)}", flush=True)
         eps = np.clip(eps, -cap, cap)
 
         # shift the entire front once by this epsilon
@@ -674,37 +448,20 @@ def main():
         pareto_input[:, 0] += eps[0]
         pareto_input[:, 1] += eps[1]
 
-        print(f"Epsilons for PARETO FRONT for seq {args.seq_id}, candidate {args.cand_id}: {(eps)}", flush=True)
-
+        print(f"Capped Epsilons for PARETO FRONT for seq {args.seq_id}, candidate {args.cand_id}: {(eps)}", flush=True)
     else:
         pareto_input = pareto_front.copy()
 
-    # get ref point for the hypervolume calculation
-    ref_point = refpoint(pareto_input, front=args.front)
-
-
-    if args.front == 'upper':
-        pareto_input *= -1  # transform to third quadrant for minimization
-
-    #ref_point = make_ref_point_min_space(pareto_input, margin=0.15)  # 0.15 is a good margin for the reference point
-
-    assert np.all(ref_point >= pareto_input.max(axis=0)), "ref must be >= worst point (min space)."
-
-
-    print("MIN-SPACE sanity:")
-    print("pareto_min min:", pareto_input.min(axis=0), " max:", pareto_input.max(axis=0), flush=True)
-    print("ref_point:", ref_point, flush=True)
-    print("ref >= worst? ", np.all(ref_point >= pareto_input.max(axis=0)), flush=True)
-        
-    hv_base = hypervolume(pareto_input).compute(ref_point)
-    print(f"Base hypervolume of the Pareto front: {hv_base}", flush=True)
+    
+    augmented_front = ehvi.front_augmentation(pareto_input, args.front, epsilons=None if args.ehvi_variant == 'standard' else (eps[0], eps[1]))
 
    
 
-    ga_B2 = ga(function=lambda seq: fitness_function_batch(seq, featurizer, pareto_input, hv_base, ref_point, \
-                                                           model, normalization_stats, front=args.front),
+    ga_B2 = ga(function=lambda seq: fitness_function_batch(seq, args.seq_id, featurizer, augmented_front, \
+                                                           propseq_arr, model, likelihood, \
+                                                            normalization_stats, args.front, exploration=args.exploration_strategy),
                algorithm_parameters={
-                   'max_num_iteration': 100,
+                   'max_num_iteration': 200,
                    'population_size': len(init_pop),
                    'mutation_probability': 0.5,
                    'elit_ratio': 0.01,
@@ -726,60 +483,9 @@ def main():
     output_fitness = ga_B2.best_function
 
 
-    # todo: potentially re-add the comparison between the two methods in some efficient way
-
-    # ## get fitness for best sequence using old method
-    # seq_list = back_AA(output_sequence) 
-    # #seq_feats_list = [featurizer.featurize(seq) for seq in sequences]
-    # seq_feats_list = featurizer.featurize(seq_list)
-    # seq_feats_list_arr = np.asarray(seq_feats_list)
-    # # seq_feats_list_arr = seq_feats_list_arr[np.newaxis, :]  # Add a new axis to make it 2D
-    # seq_feats_normal_list = standard_normalize_features(seq_feats_list_arr, normalization_stats)
-    # seq_arr = seq_feats_normal_list[np.newaxis, :] 
-    # #seq_arr = np.array(seq_feats_normal_list)
-
-    # # Convert all features to a tensor batch
-    # seq_tensor_batch = torch.tensor(seq_arr).float()
-
-    # # make prediction for this sequence
-    # with torch.no_grad(), gpytorch.settings.fast_pred_var():
-    #     output = likelihood(model(seq_tensor_batch))
-    #     mean = output.mean.numpy()
-    #     var = output.stddev.numpy()
-
-    # print(f"Predicted B2: {mean[0, 0]}, Predicted diff: {mean[0, 1]}", flush=True)
-
-    # if args.front == 'upper':
-    #     pareto_input *= -1  # transform to third quadrant for minimization
-    
-
-    # augmented_front = ehvi.front_augmentation(pareto_input, args.front)
-
-    # # make sure that mean and var are reshaped to be (1, 1) , eg in array format
-    # pred_B2_reshaped = np.array([mean[0, 0]]).reshape(-1, 1)
-    # std_B2 =np.array([var[0, 0]]).reshape(-1, 1)
-    # pred_diff_reshaped = np.array([mean[0, 1]]).reshape(-1, 1)
-    # std_diff = np.array([var[0, 1]]).reshape(-1, 1)
-
-    # if args.front == 'lower':
-    #     ehvi_values = ehvi.ehvi_maximization(pred_B2_reshaped, std_B2, pred_diff_reshaped, std_diff, augmented_front)
-    # elif args.front == 'upper':
-    #     ehvi_values = ehvi.ehvi_maximization(-pred_B2_reshaped, std_B2, -pred_diff_reshaped, std_diff, augmented_front)
-
-
-    # if isinstance(ehvi_values, np.ndarray):
-    #     if ehvi_values.ndim > 0:
-    #         ehvi_val = ehvi_values[0,0]
-    #     else:
-    #         ehvi_val = ehvi_values[0]
-    # else:
-    #     ehvi_val = ehvi_values
-    # #print(f"EHVI value for sequence {args.seq_id}, candidate {args.cand_id}: {ehvi_val}", flush=True)
-
-    # difference = np.abs(-1*output_fitness - ehvi_val)/np.abs(output_fitness)
-    candidates_folder = os.path.join(args.gen_folder, f"candidates_{args.ehvi_variant}_{args.exploration_strategy}_{transform}")
+    candidates_folder = os.path.join(args.gen_folder, f"candidates_{args.ehvi_variant}_{args.exploration_strategy}_{args.transform}")
     # Save the best sequence and its fitness
-    save_cand_sequence(output_sequence, output_fitness, candidates_folder, args.cand_id, difference=0.0)
+    save_cand_sequence(output_sequence, output_fitness, candidates_folder, args.cand_id)
 
     
 if __name__ == "__main__":

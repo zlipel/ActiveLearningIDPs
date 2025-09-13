@@ -6,14 +6,14 @@ import pandas as pd
 import argparse
 from time import time
 import os
-from TRAINING.gpr_model import MultitaskGPRegressionModel
-from geneticalgorithm_m2 import geneticalgorithm_batch as ga
-from UTILS.data_preprocessing_gpr import load_dataset
+from al_pipeline.models.gpr_model import MultitaskGPRegressionModel
+from al_pipeline.selection.geneticalgorithm_m2 import geneticalgorithm_batch as ga
+from al_pipeline.features.data_preprocessing import load_dataset
 # from utils.ehvi_2d import psi, ehvi_batch
-import UTILS.ehvi as ehvi
+from al_pipeline.selection import ehvi
 from sklearn.model_selection import train_test_split
 from joblib import Parallel, delayed
-import sequence_featurizer as sf
+from . import sequence_featurizer as sf
 import pickle
 from umap import UMAP
 import matplotlib.pyplot as plt
