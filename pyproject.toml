@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "active-learning-idps"
+version = "0.1.0"
+description = "Active learning pipeline for intrinsically disordered protein sequences"
+authors = [{name = "Your Name", email = "you@example.com"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "torch",
+    "gpytorch",
+    "pandas",
+    "scikit-learn",
+    "joblib",
+    "umap-learn",
+    "matplotlib",
+    "seaborn",
+    "scipy",
+    "tqdm"
+]
+
+[project.scripts]
+active-learning-pipeline = "sequence_pipeline:run_sequence_pipeline"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["al_pipeline"]
+
