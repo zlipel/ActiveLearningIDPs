@@ -1,7 +1,6 @@
 import argparse
 
 
-
 def main():
     """Collect child sequences and write them as GA candidates."""
 
@@ -27,6 +26,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
-
