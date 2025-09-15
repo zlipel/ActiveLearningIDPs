@@ -95,7 +95,7 @@ if [[ "$EXPLORE" == "kriging_believer" || "$EXPLORE" == "constant_liar_min" || "
         --monte_carlo "MC" 
         
         
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/generate_parents.py \
+    python -m al_pipeline.selection.generate_parents \
         --features_path "$ITERATION_DIR/features_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.csv" \
         --labels_path "$ITERATION_DIR/labels_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.csv" \
         --output_path "$BASE_DIR" \

@@ -16,6 +16,7 @@ MODEL_TO_FILE = {
 }
 
 class SequenceFeaturizer:
+
     """Featurize amino acid sequences using coarse-grained models.
 
     Parameters
@@ -39,12 +40,14 @@ class SequenceFeaturizer:
         Hydrophobicity parameters when available.
     """
 
+
     def __init__(self, model_name: str, db_path: str):
         self.model = model_name
         self.db_path = db_path
         self._load_model_params()
 
     def _load_model_params(self):
+
         """Load force-field parameters for the chosen model.
 
         Side Effects
@@ -52,6 +55,7 @@ class SequenceFeaturizer:
         Populates dictionaries containing per-residue charge, mass and
         hydrophobicity values which are later used for feature generation.
         """
+
 
         self.ff_db = SourceFileLoader('ff_db', f"{self.db_path}/ff_db.py").load_module()
         self.ff_db.import_parameters(f"{self.db_path}/{MODEL_TO_FILE[self.model]}")
@@ -71,6 +75,7 @@ class SequenceFeaturizer:
                 self.charge_dict[f"{aa}c"] = self.atm_types[f"{aa}c"]['q']
 
     def featurize(self, sequence: str) -> list:
+
         """Generate numeric features for a single sequence.
 
         Parameters
@@ -84,6 +89,7 @@ class SequenceFeaturizer:
             Ordered set of physicochemical features describing the sequence.
         """
 
+
         seq_len = len(sequence)
         comp = [sequence.count(aa) for aa in AMINO_ACIDS]
         entropy = -sum(p / seq_len * np.log2(p / seq_len) for p in comp if p > 0)
@@ -92,10 +98,12 @@ class SequenceFeaturizer:
         if self.model == "calvados":
             net_charge += self.charge_dict[f"{sequence[0]}n"] - self.charge_dict[sequence[0]]
             net_charge += self.charge_dict[f"{sequence[-1]}c"] - self.charge_dict[sequence[-1]]
+
         abs_net_charge = abs(net_charge)
 
         pos_frac = sum(1 for aa in sequence if self.charge_dict[aa] > 0)
         neg_frac = sum(1 for aa in sequence if self.charge_dict[aa] < 0)
+
 
         mass = sum(self.mass_dict[aa] for aa in sequence)
 
@@ -155,6 +163,7 @@ class SequenceFeaturizer:
         avg_lambda = sum(
             self.nonbon_types[tuple(sorted((aa, aa)))]['eps'] / 0.2 for aa in seq
         )
+
         for i in range(n):
             for j in range(i + 1, n):
                 pair = tuple(sorted((seq[i], seq[j])))

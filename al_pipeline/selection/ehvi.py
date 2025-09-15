@@ -4,9 +4,11 @@ from scipy.special import ndtr  # This is equivalent to the CDF of the normal di
 import torch
 import gpytorch
 
+
 # The module relies on numpy and SciPy's normal distribution utilities.
 import numpy as np
 from scipy.stats import norm
+
 
 def exipsi_vectorized(a, b, m, s):
     """
@@ -23,6 +25,7 @@ def exipsi_vectorized(a, b, m, s):
 
 
 def reference_point_on_IN_line(
+
     pareto_Y: np.ndarray,
     front: str,
     k: float = 1.0,
@@ -50,6 +53,7 @@ def reference_point_on_IN_line(
         Reference point ``R`` and auxiliary data ``(I, N, u, L)`` describing
         the ideal and nadir points and step geometry.
     """
+
 
     Y = np.asarray(pareto_Y, float)
 
@@ -90,7 +94,8 @@ def reference_point_on_IN_line(
     return R, I, N, u, L
 
 
-def front_augmentation(pareto_front, front, epsilons=None):
+def front_augmentation(pareto_front, front):
+
     """Augment and orient the Pareto front for EHVI computation.
 
     Parameters
@@ -108,10 +113,6 @@ def front_augmentation(pareto_front, front, epsilons=None):
         Augmented front including reference points suitable for EHVI.
     """
 
-    # if epsilons is not None:
-    #     pareto_front = np.array(pareto_front)
-    #     pareto_front[:,0] = pareto_front[:,0] - epsilons[0]
-    #     pareto_front[:,1] = pareto_front[:,1] - epsilons[1]
 
     minB = np.min(pareto_front[:,0])
     minD = np.min(pareto_front[:,1])

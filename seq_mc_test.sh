@@ -151,7 +151,7 @@ python /home/zl4808/PROJECTS/MODEL_COMPARISON/train_gpr_multitask_mc.py \
 # -------------------------------
 echo "Generating parent sequences for iteration $ITER..."
 if [[ $ITER -eq 0 ]]; then
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/generate_parents.py \
+    python -m al_pipeline.selection.generate_parents \
         --features_path "$ITERATION_DIR/features_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.csv" \
         --labels_path "$ITERATION_DIR/labels_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.csv" \
         --output_path "$BASE_DIR" \
@@ -169,7 +169,7 @@ else
     cp "$SEQ_SIM_FILE" "$CURR_SEQ_FILE"
     SEQ_FILE="$ITERATION_DIR/seq_gen$ITER.txt"
     cat "$PREV_SEQ_FILE" "$CURR_SEQ_FILE" > "$SEQ_FILE"
-    python /home/zl4808/PROJECTS/MODEL_COMPARISON/generate_parents.py \
+    python -m al_pipeline.selection.generate_parents \
         --features_path "$ITERATION_DIR/features_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.csv" \
         --labels_path "$ITERATION_DIR/labels_gen${ITER}_NORM_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.csv" \
         --output_path "$BASE_DIR" \

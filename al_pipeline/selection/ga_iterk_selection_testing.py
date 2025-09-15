@@ -1,3 +1,30 @@
+
+import numpy as np
+import torch
+import gpytorch
+import argparse
+from time import time
+import os
+from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
+from . import ehvi
+from joblib import Parallel, delayed
+from al_pipeline.features import sequence_featurizer as sf
+from .utils import (
+    AA2num,
+    back_AA,
+    load_normalization_stats,
+    standard_normalize_features,
+    load_gpr_models,
+    alpha,
+    load_pareto_front,
+    save_cand_sequence,
+)
+
+
+
+
+
+
 """Sequential GA candidate generation and EHVI evaluation."""
 
 import json
@@ -208,6 +235,7 @@ def alpha(sequences, propseqs, seq_id):
         full_matrix = np.where(full_matrix == 0, 1e-6, full_matrix) ** (-1)
 
         return (seq_id - 1)/np.sum(full_matrix, axis=1) # similarity penalty per candidate,
+
         
 
 
@@ -286,6 +314,7 @@ def fitness_function_batch(sequences, seq_id, featurizer, augmented_front, props
     return  -ehvi_values*alpha_values # fitness function (minimize negative EHVI)
 
 
+
 def load_pareto_front(master_path, iteration, columns, scalers, ehvi_variant, exploration, seq_id, transform):
     """
     Load the Pareto front of B2 and diff values for the specified iteration.
@@ -333,6 +362,7 @@ def save_cand_sequence(sequence, fitness, output_folder, cand_id):
     with open(seq_file, 'w') as f:
         f.write(back_AA(sequence) + '\n')
         f.write(str(fitness) + '\n')
+
 
 
 def main():
@@ -437,11 +467,9 @@ def main():
         eps = sign * k * sigma_bar                           # shape (2,)
 
         # cap by a fraction of the front's span to prevent "unbeatable" pushes
-        span = np.ptp(pareto_front, axis=0).clip(min=1e-12)  # per-objective range
-        cap  = 0.2 * span                                    # 20% cap; tune 0.1–0.3
-        print(f"Span for PARETO FRONT for seq {args.seq_id}, candidate {args.cand_id}: {(span)}", flush=True)
+
         print(f"Raw epsilons for PARETO FRONT for seq {args.seq_id}, candidate {args.cand_id}: {(eps)}", flush=True)
-        eps = np.clip(eps, -cap, cap)
+    
 
         # shift the entire front once by this epsilon
         pareto_input = pareto_front.copy()

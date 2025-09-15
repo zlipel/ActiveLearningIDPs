@@ -5,6 +5,7 @@ import os
 import argparse
 
 def main():
+
     """Merge simulation outputs into a single labels CSV.
 
     Parameters are read from the command line to locate simulation results for
@@ -16,6 +17,7 @@ def main():
     Writes a CSV file containing all collected labels for the current
     iteration.
     """
+
 
     # Define arguments and parse.
     parser = argparse.ArgumentParser(description='Generate label csv for sequences.')

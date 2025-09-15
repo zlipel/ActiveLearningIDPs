@@ -6,8 +6,10 @@ import copy  # Import for deep copy
 import matplotlib.pyplot as plt
 
 
+
 class geneticalgorithm:
     """Genetic algorithm for sequence optimization."""
+
 
     def __init__(self, function=None, variable_type='int', \
                  function_timeout=100,\
@@ -57,7 +59,6 @@ class geneticalgorithm:
             self.mniwi = int(self.param['max_iteration_without_improv'])
         
     def run(self, init_pop=None):
-        """Execute the evolutionary loop."""
 
         # Initial Population
         print('Starting GA...')
@@ -140,7 +141,7 @@ class geneticalgorithm:
 
         
     def initialize_population(self):
-        """Randomly generate an initial population of sequences."""
+
         pop = []
         for _ in range(self.pop_s):
             N = np.random.randint(20, 51)  # Sequence length between 20 and 50
@@ -149,14 +150,18 @@ class geneticalgorithm:
         return pop
 
     def select_parents(self, pop_sort):
-        """Select two parents from the fittest individuals."""
+
+        # Select two parents from the top 30%
+
         top_parents = pop_sort[:int(0.3 * self.pop_s)]
         parent1 = copy.deepcopy(random.choice(top_parents))
         parent2 = copy.deepcopy(random.choice(top_parents))
         return parent1, parent2
     
     def apply_moves(self, x, y):
+
         """Apply genetic operators to two parent sequences."""
+
         if np.random.random() < self.crossover_prob:
             x, y = self.crossover(x, y)
         if np.random.random() < self.deletion_prob:
@@ -169,17 +174,44 @@ class geneticalgorithm:
         return x, y
 
     def crossover(self, x, y):
-        """Exchange subsequences between parents."""
-        N, M = len(x), len(y)
-        s1, s2 = sorted(np.random.randint(1, min(N, M), size=2))
-        s3 = np.random.randint(1, max(N, M) - (s2 - s1))
 
+        N, M = len(x), len(y)
+        s1, s2 = sorted(np.random.randint(1, min(N, M), size=2))  # Ensuring s1 < s2
+        s3 = np.random.randint(1, max(N, M) - (s2 - s1))
+        
+        # Perform crossover based on the image procedure
         sub_x = x[s1:s2]
         sub_y = y[s3:s3 + (s2 - s1)]
-
+        
+        # Swap the sub-sequences
         x[s1:s2], y[s3:s3 + (s2 - s1)] = sub_y, sub_x
-
+        
         return x, y
+    
+    def deletion(self, seq):
+        N = len(seq)
+        if N > 20:
+            ldel = np.random.randint(0, N - 20)  # Length of deletion
+            s = np.random.randint(0, N - ldel)  # Start of deletion
+            seq = seq[:s] + seq[s + ldel:]  # Remove sub-sequence
+        return seq
+    
+    def growth(self, seq):
+        N = len(seq)
+        if N < 50:
+            lgro = np.random.randint(0, 50 - N)  # Length of growth
+            s = np.random.randint(0, N)  # Insertion position
+            subseq = seq[:lgro]  # Replicate sub-sequence
+            seq = seq[:s] + subseq + seq[s:]  # Insert sub-sequence
+        return seq
+    
+    def mutate(self, seq):
+        N = len(seq)
+        s = np.random.randint(0, N)  # Random mutation index
+        seq[s] = np.random.randint(0, 20)  # Mutate to a new amino acid
+
+       
+       return seq
     
     def deletion(self, seq):
         """Remove a random subsequence."""
@@ -205,10 +237,22 @@ class geneticalgorithm:
         N = len(seq)
         s = np.random.randint(0, N)
         seq[s] = np.random.randint(0, 20)
+
         return seq
     
 ###############################################################################     
     def evaluate(self):
+
+        return self.f(self.temp)
+    
+###############################################################################    
+    def sim(self,X):
+        self.temp=X.copy()
+        obj = self.evaluate()  # Run the objective function
+        return obj
+        
+    def final_report(self, pop):
+
         """Evaluate the objective function on the temporary sequence."""
         return self.f(self.temp)
     
@@ -221,6 +265,7 @@ class geneticalgorithm:
         
     def final_report(self, pop):
         """Print best solution and optionally plot convergence."""
+
         best = min(pop, key=lambda x: x[-1])
         print(f"The best solution found: {best[:-1]}")
         print(f"Objective function: {best[-1]}")
@@ -232,7 +277,9 @@ class geneticalgorithm:
             plt.show()
 
     def progress(self, count, total, status=''):
+
         """Simple progress bar for console output."""
+
         bar_len = 50
         filled_len = int(round(bar_len * count / float(total)))
         percents = round(100.0 * count / float(total), 1)

@@ -1,28 +1,32 @@
+
+import numpy as np
+import torch
+import gpytorch
+import argparse
+from time import time
+import os
+from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
+from . import ehvi
+from joblib import Parallel, delayed
+from al_pipeline.features import sequence_featurizer as sf
+from pygmo import hypervolume
+from .utils import (
+    AA2num,
+    back_AA,
+    load_normalization_stats,
+    standard_normalize_features,
+    load_gpr_models,
+    load_pareto_front,
+    save_cand_sequence,
+)
+
+
 """Generate candidate sequences using a GA and evaluate with EHVI.
 
 This script orchestrates the data flow for a single Monte Carlo candidate in
 the active learning loop: featurization, model loading, EHVI computation and
 sequence optimization via a genetic algorithm.
 """
-
-import json
-import numpy as np
-import torch
-import gpytorch
-import pandas as pd
-import argparse
-from time import time
-import os
-from al_pipeline.models.gpr_model import GPRegressionModel, MultitaskGPRegressionModel
-from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
-from al_pipeline.features.data_preprocessing import load_dataset
-from . import ehvi
-from sklearn.model_selection import train_test_split
-from joblib import Parallel, delayed
-from al_pipeline.features import sequence_featurizer as sf
-import pickle
-from sklearn.preprocessing import StandardScaler, PowerTransformer
-from pygmo import hypervolume
 
 
 
@@ -214,6 +218,7 @@ def alpha(sequences, propseqs, seq_id):
         full_matrix = np.where(full_matrix == 0, 1e-6, full_matrix) ** (-1)
 
         return (seq_id - 1)/np.sum(full_matrix, axis=1) # similarity penalty per candidate,
+
 
 def minmax_scale(X, ref_min=None, ref_max=None):
     if ref_min is None:
@@ -571,6 +576,7 @@ def save_cand_sequence(sequence, fitness, output_folder, cand_id, difference=Non
             f.write(str(difference) + '\n')
 
 
+
 def main():
     timeinit = time()
     parser = argparse.ArgumentParser(description='Run Genetic Algorithm for intermediate iterations of active learning.')
@@ -605,8 +611,10 @@ def main():
     transform = args.transform + '_MC' 
 
     # Load the GPR models and normalization stats
+
     model, likelihood, scalers, feats_tensor, labels_norm = load_gpr_models(args.model_path, args.iter_folder, args.iteration, objectives, args.ehvi_variant, args.exploration_strategy, args.seq_id, transform)
     normalization_stats = load_normalization_stats(os.path.join(args.iter_folder, f'normalization_stats.json'))
+
 
     model.eval()
     likelihood.eval()

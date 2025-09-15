@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 
+
 def select_best_sequence(input_folder, output_file, seq_id, monte_carlo=None):
     """Choose the sequence with the best fitness and save it.
 
@@ -27,6 +28,7 @@ def select_best_sequence(input_folder, output_file, seq_id, monte_carlo=None):
         specified, also returns the Monte Carlo difference.
     """
 
+
     best_fitness = float('inf')  # Assuming we minimize the fitness
     best_sequence = ""
 
@@ -37,7 +39,9 @@ def select_best_sequence(input_folder, output_file, seq_id, monte_carlo=None):
                 sequence = f.readline().strip()       # Assuming sequence is on the first line
                 fitness = float(f.readline().strip()) # Assuming fitness is on the second line
                 if monte_carlo is not None:
+
                     # if mc is not none, then the third line is the difference between the two methods
+
                     mc_difference = float(f.readline().strip())
 
                 if fitness < best_fitness:
@@ -51,9 +55,11 @@ def select_best_sequence(input_folder, output_file, seq_id, monte_carlo=None):
     print(f"Sequence {seq_id} saved to {output_file}")
     print(f"Best sequence: {best_sequence} with fitness {best_fitness}", flush=True)
     if monte_carlo is not None:
+
         return -1 * best_fitness, mc_difference
     else:
         return -1 * best_fitness
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Select the best sequence from a set of generated sequences.")
@@ -97,4 +103,6 @@ if __name__ == "__main__":
         else:
             print(f"Error: {csv_path} does not exist. Creating a new file.")
 
+
     print(f"EHVI values saved to {os.path.join(output_folder, f'ehvi_values_{args.ehvi_variant}_{args.exploration_strategy}_{transform}.csv')}", flush=True)
+

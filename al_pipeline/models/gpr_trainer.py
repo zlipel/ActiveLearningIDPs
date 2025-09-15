@@ -30,6 +30,7 @@ class GPRTrainer:
         self.likelihood.train()
     
     def train(self, train_dat, val_dat, test_loader=None, early_stop=True):
+
         """Train the GP model.
 
         Parameters
@@ -48,6 +49,7 @@ class GPRTrainer:
         dict
             Training (and optionally validation) loss history.
         """
+
 
         train_losses = []
         val_losses = []
@@ -100,22 +102,6 @@ class GPRTrainer:
                                 self.model.load_state_dict(best_state_dict)
                                 break
     
-            # if test_loader is not None:
-            #     val_loss = self.evaluate(val_x, val_y)
-            #     val_losses.append(val_loss)
-    
-            #     if early_stop:
-            #         if val_loss < best_val_loss:
-            #             best_val_loss = val_loss
-            #             best_state_dict = self.model.state_dict()
-            #             patience_counter = 0
-            #         else:
-            #             patience_counter += 1
-            #             if patience_counter > self.patience:
-            #                 print(f"Early stopping at epoch {epoch}")
-            #                 self.model.load_state_dict(best_state_dict)
-            #                 break
-    
             if epoch % 10 == 0:
                 print(f"Epoch {epoch}/{self.epochs} - Loss: {epoch_loss} - lengthscale: {self.model.covar_module.base_kernel.lengthscale.item()} - noise: {self.model.likelihood.noise.item()}")
 
@@ -125,6 +111,7 @@ class GPRTrainer:
             return {"train_losses": train_losses}
 
     def evaluate(self, val_x, val_y):
+       
         """Evaluate the model on validation data.
 
         Parameters
@@ -138,6 +125,7 @@ class GPRTrainer:
         -------
         float
             Mean squared error of the predictions.
+
         """
         self.model.eval()
         self.likelihood.eval()
@@ -184,6 +172,7 @@ class MultitaskGPRTrainer:
         self.likelihood.train()
     
     def train(self, train_dat, val_dat, test_loader=None, early_stop=True):
+
         """Train the multitask GP model with optional early stopping."""
 
         train_losses = []
@@ -262,7 +251,17 @@ class MultitaskGPRTrainer:
             return {"train_losses": train_losses}
 
     def evaluate(self, val_x, val_y):
-        """Evaluate the multitask model on validation data."""
+
+        """
+        Evaluate the GPR model on a given dataset.
+        
+        Args:
+            data_loader (DataLoader): DataLoader for the evaluation data.
+        
+        Returns:
+            float: Mean squared error (MSE) over the evaluation dataset.
+        """
+
         self.model.eval()
         self.likelihood.eval()
         total_mse = 0.0
