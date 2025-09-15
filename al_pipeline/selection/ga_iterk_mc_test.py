@@ -1,3 +1,4 @@
+
 import numpy as np
 import torch
 import gpytorch
@@ -20,10 +21,203 @@ from .utils import (
 )
 
 
+"""Generate candidate sequences using a GA and evaluate with EHVI.
+
+This script orchestrates the data flow for a single Monte Carlo candidate in
+the active learning loop: featurization, model loading, EHVI computation and
+sequence optimization via a genetic algorithm.
+"""
 
 
 
+atm_types = ['A',
+ 'C',
+ 'D',
+ 'E',
+ 'F',
+ 'G',
+ 'H',
+ 'I',
+ 'K',
+ 'L',
+ 'M',
+ 'N',
+ 'P',
+ 'Q',
+ 'R',
+ 'S',
+ 'T',
+ 'V',
+ 'W',
+ 'Y']
 
+# convert string to a numpy array
+def AA2num(S, atm_types=atm_types):
+    """Encode a sequence string into numeric indices."""
+    X = [atm_types.index(i) for i in S]
+    return np.array(X)
+
+
+def back_AA(X, atm_types=atm_types):
+    """Decode numeric indices back to an amino acid string."""
+    X = np.asarray(X)
+    AA_str = [atm_types[int(i)] for i in X]
+    return ''.join(AA_str)
+
+
+def load_normalization_stats(file_path):
+    """Load feature normalization statistics from JSON."""
+    with open(file_path, 'r') as f:
+        return json.load(f)
+
+def standard_normalize_features(reshaped_features, normalization_stats):
+    """Normalize a raw feature vector using precomputed statistics."""
+    std_normal_dict = normalization_stats['std_normal_dict']
+    min_L = normalization_stats['min_L']
+    max_L = normalization_stats['max_L']
+    maxS = normalization_stats['maxS']
+
+    reshaped_features[:20] /= reshaped_features[20]
+    reshaped_features[23] /= reshaped_features[20]
+    reshaped_features[24] /= reshaped_features[20]
+    reshaped_features[25] /= reshaped_features[20]
+    reshaped_features[26] /= reshaped_features[20]
+    reshaped_features[28] /= reshaped_features[20]
+
+    reshaped_features[20] = (reshaped_features[20] - min_L) / (max_L - min_L)
+
+    std_norm_indices = {
+        'SCD': 21, 'SHD': 22, '|net charge|': 23, 'sum lambda': 24,
+        'beads(+)': 25, 'beads(-)': 26, 'shannon_entropy': 27, 'mol wt': 28
+    }
+
+    for feat, idx in std_norm_indices.items():
+        if feat == 'shannon_entropy':
+            reshaped_features[idx] = reshaped_features[idx] / maxS - 1
+        else:
+            mean_val, std_val = std_normal_dict[feat]
+            reshaped_features[idx] = (reshaped_features[idx] - mean_val) / std_val
+
+    return reshaped_features
+
+
+def load_gpr_models(model_path, master_path, iteration, model_labels, ehvi_var, explore, seq_id, transform):
+    """
+    Load the GPR models from the specified path.
+    
+    Args:
+        model_path: Path to the saved GPR models.
+        iteration: The iteration number for the active learning process.
+        model_labels: List of labels for the GPR models.
+        
+    Returns: 
+        List of GPR models, likelihoods, and scalers (for labels).
+    """
+
+    # Check if model file exists
+
+    scalers = []
+    labels_total = []
+
+
+    gpr_file = os.path.join(model_path,f'GPR_iter{iteration}_{ehvi_var}_{explore}_{transform}_TEMP.pt') if seq_id > 1 and explore not in ['standard', 'similarity_penalty'] \
+        else os.path.join(model_path,f'GPR_iter{iteration}_{ehvi_var}_{explore}_{transform}.pt')
+    
+    # features_file = os.path.join(master_path,f'features_gen{iteration}_TEMP.csv') if seq_id > 1 and explore == 'front_augmentation' \
+    #     else os.path.join(master_path,f'features_gen{iteration}.csv')
+
+    features_file = os.path.join(master_path,f'features_gen{iteration}.csv')
+    norm_features_file = os.path.join(master_path,f'features_gen{iteration}_NORM_{ehvi_var}_{explore}_{transform}.csv')
+    
+    labels_file = os.path.join(master_path,f'labels_gen{iteration}.csv') 
+    norm_labels_file = os.path.join(master_path,f'labels_gen{iteration}_NORM_{ehvi_var}_{explore}_{transform}.csv')
+
+
+    # next block is to load the 
+
+    for label in model_labels:
+        
+        if not os.path.exists(features_file):
+            raise FileNotFoundError(f"Features file not found at {features_file}")
+        
+        if not os.path.exists(labels_file):
+            raise FileNotFoundError(f"Labels file not found at {labels_file}")
+        
+        # load the training data    
+        features, labels = load_dataset(features_file, \
+                                                labels_file, \
+                                                    label_column=label)
+        if label == 'diff' and 'log' in transform:
+            # Convert diffusion coefficient to log scale
+            labels = np.log(labels + 1e-8)
+
+        if 'yeoj' in transform:
+            scaler = PowerTransformer(method='yeo-johnson')
+            scaler.fit_transform(labels.reshape(-1,1))
+        elif 'log' in transform:
+            scaler = StandardScaler()
+        # Fit the scaler to the labels
+            scaler.fit_transform(labels.reshape(-1, 1))
+        
+        scalers.append(scaler)
+        
+    
+    if not os.path.exists(gpr_file):
+            raise FileNotFoundError(f"Checkpoint not found at {gpr_file}")
+    
+    # now load the normalized features and labels up to that point 
+    if os.path.exists(norm_features_file):
+        features_norm = torch.tensor(pd.read_csv(norm_features_file).values).float()
+    else:
+        raise FileNotFoundError(f"Normalized features file not found at {norm_features_file}")
+    
+    if os.path.exists(norm_labels_file):
+        labels_norm = torch.tensor(pd.read_csv(norm_labels_file).values).float()
+    else:   
+        raise FileNotFoundError(f"Normalized labels file not found at {norm_labels_file}")
+    # Check if features and labels have the same number of samples
+    if features_norm.size(0) != labels_norm.size(0):
+        raise ValueError(f"Features and labels must have the same number of samples. Found {features_norm.size(0)} features and {labels_norm.size(0)} labels.")
+
+
+    # Load the saved state dictionary from file
+    checkpoint = torch.load(gpr_file, weights_only=True)
+
+        # Instantiate the likelihood and model classes
+    likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=2)
+    model = MultitaskGPRegressionModel(features_norm, labels_norm, likelihood, num_tasks=2) 
+
+        # Load the model and optimizer state dicts
+    model.load_state_dict(checkpoint['model'])
+    
+    return model, likelihood, scalers, features_norm, labels_norm
+
+
+def alpha(sequences, propseqs, seq_id):
+    """
+    Calculate the similarity penalty for a list of sequences based on the dot product of the sequences
+    and previously proposed sequences.
+
+    Args:
+        sequences: numpy array of sequences to calculate similarity penalty for
+        propseqs: numpy array of previously proposed sequences
+        seq_id: ID of the current sequence being generated through the 96 GA runs
+
+    Returns: numpy array of similarity penalty values for each sequence
+    """
+    if seq_id == 1:
+        return np.ones(sequences.shape[0])
+    else:
+        xidotxk = np.matmul(sequences, propseqs.T) # matrix with entries x_i dot x_k
+        magnitude_seq = np.sqrt(np.sum(sequences**2, axis=1)) # magnitude of candidates
+        magnitude_propseq = np.sqrt(np.sum(propseqs**2, axis=1)) # magnitude of previously proposed
+
+        full_matrix = 0.5 * (1.0 - xidotxk / np.outer(magnitude_seq, magnitude_propseq))
+        
+        # Replace any zero entries with a small positive value to avoid division by zero
+        full_matrix = np.where(full_matrix == 0, 1e-6, full_matrix) ** (-1)
+
+        return (seq_id - 1)/np.sum(full_matrix, axis=1) # similarity penalty per candidate,
 
 
 def minmax_scale(X, ref_min=None, ref_max=None):
@@ -331,7 +525,55 @@ def fitness_function_batch(sequences, featurizer, pareto_input, hv_base, ref_poi
     return  -1*ehvi_values # fitness function (minimize negative EHVI)
 
 
+def load_pareto_front(master_path, iteration, columns, scalers, ehvi_variant, exploration, seq_id, transform):
+    """
+    Load the Pareto front of B2 and diff values for the specified iteration.
+    Args:
+        master_path: Path to the master folder for the project.
+        iteration: The iteration number for the active learning process.
+        columns: List of columns to load from the labels file.
+        scalers: List of scalers to standardize the labels.
+        
+    Returns: 
+        Numpy array of the Pareto front values in the shape of [N, 2] where N is the number of sequences.
+    """
 
+    labels = pd.read_csv(os.path.join(master_path,f'labels_parent_NORM_{ehvi_variant}_{exploration}_{transform}.csv')) if exploration not in  ['standard', 'similarity_penalty'] \
+        else pd.read_csv(os.path.join(master_path,f'labels_parent.csv'))
+    pareto_front = labels[columns].values
+
+    feats = pd.read_csv(os.path.join(master_path,f'features_parent_NORM_{ehvi_variant}_{exploration}_{transform}.csv'))
+    
+    if exploration == 'kriging_believer' or exploration == 'constant_liar_min' or exploration == 'constant_liar_mean' or exploration == 'constant_liar_max':
+            # If we are using the front augmentation, we need to standardize the Pareto front based on the generation 
+        return pareto_front, feats.values
+    else:
+        for i, scaler in enumerate(scalers):
+            if i == 0:
+                pareto_front[:,i] = scaler.transform(pareto_front[:,i].reshape(-1,1)).flatten() # convert to standard scaling based on generation
+            elif i == 1:
+                pareto_front[:,i] = scaler.transform(np.log(pareto_front[:,i]+1e-8).reshape(-1,1)).flatten()
+        
+        return pareto_front, feats.values
+
+
+def save_cand_sequence(sequence, fitness, output_folder, cand_id, difference=None):
+    """
+    Save the candidate sequence as a text file with the specified candidate ID.
+    
+    Args:
+        sequence: The generated candidate sequence.
+        output_folder: Folder where the sequence should be saved.
+        cand_id: Unique ID for each candidate (used in the filename).
+    """
+    seq_file = os.path.join(output_folder, f"seq_cand_{cand_id}.txt")
+
+    # Save sequence to the file
+    with open(seq_file, 'w') as f:
+        f.write(back_AA(sequence) + '\n')
+        f.write(str(fitness) + '\n')
+        if difference is not None:
+            f.write(str(difference) + '\n')
 
 
 
@@ -369,19 +611,10 @@ def main():
     transform = args.transform + '_MC' 
 
     # Load the GPR models and normalization stats
-    model, likelihood, scalers, _ = load_gpr_models(
-        args.model_path,
-        args.iter_folder,
-        args.iteration,
-        objectives,
-        args.ehvi_variant,
-        args.exploration_strategy,
-        args.seq_id,
-        transform,
-    )
-    normalization_stats = load_normalization_stats(
-        os.path.join(args.iter_folder, f'normalization_stats.json')
-    )
+
+    model, likelihood, scalers, feats_tensor, labels_norm = load_gpr_models(args.model_path, args.iter_folder, args.iteration, objectives, args.ehvi_variant, args.exploration_strategy, args.seq_id, transform)
+    normalization_stats = load_normalization_stats(os.path.join(args.iter_folder, f'normalization_stats.json'))
+
 
     model.eval()
     likelihood.eval()

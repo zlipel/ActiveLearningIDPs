@@ -1,4 +1,7 @@
 #!/bin/bash
+# Launch a batch of Monte Carlo GA evaluations for a single sequence.
+# Each task generates candidate sequences, evaluates them with EHVI, and
+# aggregates the best child for the active learning loop.
 #SBATCH --job-name=GA_batch_run_iterk
 #SBATCH --output=logs/seq_num_%j.out
 #SBATCH --error=logs/seq_num_%j.err

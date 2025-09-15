@@ -37,16 +37,37 @@ class GPRegressionModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 class MultitaskGPRegressionModel(gpytorch.models.ExactGP):
+
+
     def __init__(self, train_x, train_y, likelihood, num_tasks=2):
+        """Initialize the multitask GP with shared kernel.
+
+        Parameters
+        ----------
+        train_x : torch.Tensor
+            Training inputs.
+        train_y : torch.Tensor
+            Training targets for all tasks.
+        likelihood : gpytorch.likelihoods.Likelihood
+            Likelihood used for the model.
+        num_tasks : int, optional
+            Number of output tasks.
+        """
+
+
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.MultitaskMean(
             gpytorch.means.ConstantMean(), num_tasks=num_tasks
         )
         self.covar_module = gpytorch.kernels.MultitaskKernel(
+
             gpytorch.kernels.MaternKernel(nu=3./2), num_tasks=num_tasks, rank=1
         )
 
+
     def forward(self, x):
+        """Compute predictive distribution for a batch of inputs."""
+
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultitaskMultivariateNormal(mean_x, covar_x)

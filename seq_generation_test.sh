@@ -1,4 +1,6 @@
 #!/bin/bash
+# Master script coordinating feature generation, model training and GA search
+# for a full active learning iteration.
 #SBATCH --job-name=GA_iterk
 #SBATCH --output=master_gen_%j.out
 #SBATCH --error=master_gen_%j.err
