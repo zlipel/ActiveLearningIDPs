@@ -18,6 +18,13 @@ from al_pipeline.features import SequenceFeaturizer
 featurizer = SequenceFeaturizer(model_name="mpipi", db_path="/path/to/database")
 ```
 
+## Label Generation Dependencies
+
+The label generation utility (`al_pipeline.labels.generate_labels`) now depends
+only on `pandas` in addition to the Python standard library. This allows the
+script to run in lighter environments where `numpy` and `matplotlib` are not
+available.
+
 ## Slurm Usage
 
 Submit the pipeline as a batch job:
