@@ -1,13 +1,7 @@
 import numpy as np
 from scipy.stats import norm
-from scipy.special import ndtr  # This is equivalent to the CDF of the normal distribution (Phi)
-import torch
-import gpytorch
 
-
-# The module relies on numpy and SciPy's normal distribution utilities.
-import numpy as np
-from scipy.stats import norm
+__doc__ = """Utility helpers for expected hypervolume improvement calculations."""
 
 
 def exipsi_vectorized(a, b, m, s):
