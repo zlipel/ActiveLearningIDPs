@@ -16,7 +16,6 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "joblib",
-    "umap-learn",
     "matplotlib",
     "seaborn",
     "scipy",

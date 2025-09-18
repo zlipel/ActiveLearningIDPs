@@ -4,21 +4,11 @@ import torch
 import gpytorch
 import pandas as pd
 import argparse
-from time import time
 import os
 from al_pipeline.models.gpr_model import MultitaskGPRegressionModel
-from al_pipeline.selection.geneticalgorithm_m2 import geneticalgorithm_batch as ga
 from al_pipeline.features.data_preprocessing import load_dataset
 # from utils.ehvi_2d import psi, ehvi_batch
-from al_pipeline.selection import ehvi
-from sklearn.model_selection import train_test_split
-from joblib import Parallel, delayed
 from . import sequence_featurizer as sf
-import pickle
-from umap import UMAP
-import matplotlib.pyplot as plt
-import seaborn as sns
-from glob import glob
 from sklearn.preprocessing import StandardScaler, PowerTransformer
 
 def save_chkpt(model_path, model, optimizer=None, val_losses=None, train_losses=None, trained=False):
@@ -33,7 +23,7 @@ def save_chkpt(model_path, model, optimizer=None, val_losses=None, train_losses=
         train_losses (list of float): A list containing the training losses.
     """
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    if trained==True:
+    if trained:
         state_dict = {
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
@@ -63,7 +53,6 @@ def load_gpr_models(model_path, master_path, iteration, model_labels, ehvi_var, 
     # Check if model file exists
 
     scalers = []
-    labels_total = []
 
 
     gpr_file = os.path.join(model_path,f'GPR_iter{iteration}_{ehvi_var}_{explore}_{transform}_TEMP.pt') if seq_id > 1 and explore not in ['standard', 'similarity_penalty'] \
@@ -216,7 +205,7 @@ def main():
     objectives = [args.obj1, args.obj2]
     print(f"objectives:{objectives}", flush=True)
 
-    normalization_stats = load_normalization_stats(os.path.join(args.iter_folder, f'normalization_stats.json'))
+    normalization_stats = load_normalization_stats(os.path.join(args.iter_folder, 'normalization_stats.json'))
     model, likelihood, scalers = load_gpr_models(args.model_path, args.iter_folder, args.iteration, objectives, args.ehvi_variant, args.exploration_strategy, args.seq_id, transform)
     print("models and stats loaded", flush=True)
     model.eval()
@@ -259,7 +248,6 @@ def main():
             preds = likelihood(model(torch.tensor(features).float())).mean.detach().numpy()
     elif args.exploration_strategy in ['constant_liar_min', 'constant_liar_mean', 'constant_liar_max']:
         # first, get the generation we are at
-        gen = args.iteration
         num_rows = 120 + args.iteration * 48  # 120 is the number of rows in the first generation, 48 is the number of rows added in each subsequent generation
         
         # choose either min, mean or max of the labels before our sequential batch generation as a constant lie
