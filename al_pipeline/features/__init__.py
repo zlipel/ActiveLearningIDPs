@@ -9,7 +9,6 @@ from .calculate_normalization_stats import calculate_normalization_stats
 from .data_preprocessing import (
     convert_and_normalize_features,
     load_dataset,
-    ProteinDataset,
     load_classification_dataset,
     ClassificationDataset,
 )
@@ -22,7 +21,6 @@ __all__ = [
     "calculate_normalization_stats",
     "convert_and_normalize_features",
     "load_dataset",
-    "ProteinDataset",
     "load_classification_dataset",
     "ClassificationDataset",
     "SequenceFeaturizer",

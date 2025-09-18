@@ -3,20 +3,16 @@ import os
 # Import model definitions
 from .gpr_model import GPRegressionModel, MultitaskGPRegressionModel
 from .rf_model import RandomForestClassifierModel
-from .DNN_Model import DNN
 
 from sklearn.ensemble import RandomForestClassifier
 
 # Import the trainer classes
 from .gpr_trainer import GPRTrainer, MultitaskGPRTrainer
-from .dnn_trainer import Trainer
 
 # Import the data preprocessing functions
 from al_pipeline.features.data_preprocessing import (
     load_dataset,
-    ProteinDataset,
     load_classification_dataset,
-    ClassificationDataset,
 )
 
 # Additional imports
@@ -24,7 +20,6 @@ from sklearn.model_selection import KFold, train_test_split, GridSearchCV
 from sklearn.metrics import r2_score
 import torch
 import numpy as np
-from torch.utils.data import Subset, DataLoader
 import gpytorch
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -79,7 +74,7 @@ def KFold_GPR(features_file, labels_file, label_column='B2', k=5, epochs=10, pat
         None: Prints the training and validation mean squared error (MSE) for each fold and saves the best model.
     """
     # Load the dataset using the preprocessing utility
-    feats, labels, scaler = load_dataset(features_file, labels_file, label_column=label_column)
+    feats, labels = load_dataset(features_file, labels_file, label_column=label_column)
 
     # set up hyperparameter lists
     length_scales = []
@@ -487,151 +482,6 @@ def average_model_weights(models):
         # Average the values across models
         avg_state_dict[key] = torch.stack([models[i][key] for i in range(num_models)], dim=0).mean(dim=0)
     return avg_state_dict
-
-
-def KFold_DNN(features_file, labels_file, label_column='B2', k=5, epochs=10, patience=100, lr=0.01, batch_size=64, kernel=None, model_save_path="best_gpr_model.pt", model_num=None):
-    """
-    Perform K-fold cross-validation on a GPR model and save the best model.
-
-    Args:
-        features_file (str): Path to the CSV file containing the feature data.
-        labels_file (str): Path to the CSV file containing the labels.
-        label_column (str): The name of the label column to extract from the labels file.
-        k (int): Number of folds for cross-validation.
-        epochs (int): Number of training epochs.
-        patience (int): Number of epochs to wait for improvement before early stopping.
-        lr (float): Learning rate for the optimizer.
-        batch_size (int): Batch size for training.
-        kernel (gpytorch.kernels.Kernel, optional): The kernel to use in the GP model. Defaults to Matérn kernel.
-        model_save_path (str): Path to save the best model.
-
-    Returns:
-        None: Prints the training and validation mean squared error (MSE) for each fold and saves the best model.
-    """
-    # Load the dataset for DNN (returns ProteinDataset)
-    dataset, scaler = load_dataset(features_file, labels_file, label_column=label_column, model='dnn', scaler=False)
-
-    # Set up K-fold cross-validation
-    kf = KFold(n_splits=k, shuffle=True)
-    fold = 0
-    train_mses = []
-    val_mses = []
-    best_val_mse = float('inf')
-    # model_states = []  # Store model weights for each fold
-    
-    for train_idx, val_idx in kf.split(dataset):
-        fold += 1
-        print(f"Fold {fold}")
-        
-        # Create train and validation subsets
-        train_subset = Subset(dataset, train_idx)
-        val_subset   = Subset(dataset, val_idx)
-        
-        # Create DataLoader objects
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader   = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
-
-        input_dim = dataset.features.shape[1]  # Input feature dimension
-        output_dim = 1
-        dim_list = [input_dim, 128, 64, 32]  # Customize layers based on needs
-        dnn_model = DNN(dim_list, output_dim)
- # Initialize the Trainer
-        trainer = Trainer(dnn_model, learning_rate=lr, epoch=epochs, batch_size=batch_size)
-        log = trainer.train(train_loader, val_loader, early_stop=True)
-        
-        # Evaluate the model
-        train_mse = trainer.evaluate(train_loader)
-        val_mse = trainer.evaluate(val_loader)
-        train_mses.append(train_mse)
-        val_mses.append(val_mse)
-        
-        print(f"Train MSE: {train_mse}, Val MSE: {val_mse}")
-        
-        # Save the best model based on validation performance
-        if val_mse < best_val_mse:
-            best_val_mse = val_mse
-            best_model = dnn_model.state_dict()
-            
-        dnn_model.eval()
-        feat_pred = dataset.features[val_idx]
-        val_pred = dataset.labels[val_idx]
-        ypred = dnn_model(feat_pred).detach().numpy()
-        ylab  = val_pred.detach().numpy()
-
-        
-        
-        fig, ax = plt.subplots(figsize=(2, 2), dpi=300)
-        ax.scatter(ylab, ypred, color='b', alpha=0.5)
-        ax.set_xlabel('True Values', fontsize=4)
-        ax.set_ylabel('Predicted Values', fontsize=4)
-        ax.set_title('NN model performance', fontsize=6)
-        #ax.plot([min(yte), max(yte)], [min(yte), max(yte)], 'r--')
-        ax.plot([min(ylab), max(ylab)], [min(ylab), max(ylab)], 'r--')
-        ax.tick_params(axis='both', which='both', labelsize=4, direction='in')
-        #ax.text(0.1, 0.9, f'RMSE from CV = {rmse:.4f}', transform=ax.transAxes, fontsize=10)
-        fig.tight_layout()
-        plt.show()
-        if best_model is not None:
-            if model_num is not None:
-                save_chkpt(model_save_path + f"/Master_NN_{label_column}_{model_num}.pt", dnn_model, trainer.optimizer, log["val_losses"], log["losses"])
-                print(f"Best model saved with validation MSE: {best_val_mse}")
-            else:
-                save_chkpt(model_save_path + f"/Master_NN_{label_column}.pt", dnn_model, trainer.optimizer, log["val_losses"], log["losses"])
-                print(f"Best model saved with validation MSE: {best_val_mse}")
-
-
-        # model_states.append(dnn_model.state_dict())
-
-    # Average the model weights across all folds
-    # averaged_model_state = average_model_weights(model_states)
-
-    # Load the averaged weights into the model
-    best_model = DNN(dim_list, output_dim)
-    if model_num is not None:
-        best_dict = torch.load(model_save_path + f"/Master_NN_{label_column}_{model_num}.pt")
-    else:
-        best_dict = torch.load(model_save_path + f"/Master_NN_{label_column}.pt")
-    best_model.load_state_dict(best_dict['model'])
-
-    print(f"Final k-fold Results: Train MSE: {np.mean(train_mses)} ± {np.std(train_mses)}, Val MSE: {np.mean(val_mses)} ± {np.std(val_mses)}")
-
-    feats, labels = dataset.features, dataset.labels
-
-    train_X, test_X, train_y, test_y = train_test_split(feats, labels, test_size=0.2, shuffle=True)
-
-    best_model.eval()
-
-    test_pred  = best_model(test_X).detach().numpy()
-    train_pred = best_model(train_X).detach().numpy()
-    
-    labels_test  = test_y.detach().numpy()
-    labels_train = train_y.detach().numpy()
-
-    if label_column == 'diff':
-        ax_lab = 'D'
-    elif label_column == 'B2':
-        ax_lab = '$B_2$'
-    fig, ax = plt.subplots(figsize=(2, 2), dpi=300)
-    ax.scatter(labels_train, train_pred, color='orange', alpha=0.3, label="Train")
-    ax.scatter(labels_test, test_pred, color='b', alpha=0.3, label="Test")
-    ax.set_xlabel(f'True {ax_lab}', fontsize=6)
-    ax.set_ylabel(f'Predicted {ax_lab}', fontsize=6)
-    ax.set_title('NN model performance', fontsize=6)
-    #ax.plot([min(yte), max(yte)], [min(yte), max(yte)], 'r--')
-    ax.plot([min(labels_train), max(labels_train)], [min(labels_train), max(labels_train)], 'r--')
-    ax.tick_params(axis='both', which='both', labelsize=4, direction='in')
-    #ax.text(0.1, 0.9, f'RMSE from CV = {rmse:.4f}', transform=ax.transAxes, fontsize=10)
-    plt.legend(fontsize=6)
-    fig.tight_layout()
-    if model_num is not None:
-        fig.savefig(model_save_path + f"/Master_NN_FinalFit_{label_column}_{model_num}.png", dpi=300, bbox_inches='tight')
-    else:
-        fig.savefig(model_save_path + f"/Master_NN_FinalFit_{label_column}.png", dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    # Save final model
-    # save_chkpt(f"models/Master_NN_{label_column}.pt", averaged_model, final_trainer.optimizer, final_log["val_losses"], final_log["train_losses"])
-    # print(f"Final model saved with training on the entire dataset")
 
 
 def KFold_RF_grid(features_file, labels_file, label_column="phase", k=5, param_grid=None, model_save_path="best_rf_model.pkl"):

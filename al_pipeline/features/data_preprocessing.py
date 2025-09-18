@@ -49,7 +49,7 @@ def convert_and_normalize_features(df_inp):
 
 
 # Function to load and prepare the dataset
-def load_dataset(features_file, labels_file, label_column='B2', model=None):
+def load_dataset(features_file, labels_file, label_column='B2'):
     """Load and prepare the dataset for training.
 
     Parameters
@@ -63,8 +63,8 @@ def load_dataset(features_file, labels_file, label_column='B2', model=None):
 
     Returns
     -------
-    Dataset
-        A PyTorch dataset with the features and labels ready for training.
+    tuple[numpy.ndarray, numpy.ndarray]
+        Normalized feature matrix and label vector aligned by index.
     """
     # Load and normalize features
     features_df = pd.read_csv(features_file)
@@ -84,30 +84,10 @@ def load_dataset(features_file, labels_file, label_column='B2', model=None):
     #     labels = labels_nonan[label_column].values
     labels = labels_nonan[label_column].values
 
-    # Convert features to tensor
+    # Convert features to a NumPy array
     features = feats_nonan.values
 
-    # Create dataset
-    if model == 'dnn':
-        dataset = ProteinDataset(features, labels)
-        return dataset
-    else:
-        return features, labels
-
-
-class ProteinDataset(Dataset):
-    """Dataset wrapper for regression tasks on protein features."""
-
-    def __init__(self, features, labels):
-        self.features = features
-        self.labels = labels
-
-    def __len__(self):
-        return len(self.features)
-
-    def __getitem__(self, idx):
-        """Retrieve the feature vector and label for a given index."""
-        return self.features[idx], self.labels[idx]
+    return features, labels
 
 
 # Function to load and prepare the dataset
