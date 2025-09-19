@@ -39,10 +39,10 @@ CANDIDATES_DIR="$BASE_DIR/candidates_${EHVI}_${EXPLORE}_${TRANSFORM}_MC"
 MODEL_PATH="/home/zl4808/PROJECTS/MODEL_COMPARISON/$MODEL/MODELS"
 SEQ_FILE="$ITERATION_DIR/seq_gen${ITER}_TEMP_${EHVI}_${EXPLORE}_${TRANSFORM}_MC.txt"
 
-LOG_DIR="$HOME_DIR/logs/iteration_$ITER"
+LOG_DIR="$HOME_DIR/logs/iteration_${FRONT}_$ITER"
 
 mkdir -p "$CANDIDATES_DIR"
-mkdir -p "$HOME_DIR/logs/iteration_upper_$ITER"
+mkdir -p "$LOG_DIR"
 
 # Distribute 96 tasks across 12 cores
 
