@@ -3,12 +3,17 @@ import numpy as np
 import torch
 import gpytorch
 import argparse
-from time import time
+import json
 import os
+from time import time
+import pandas as pd
 from .geneticalgorithm_m2 import geneticalgorithm_batch as ga
 from . import ehvi
 from joblib import Parallel, delayed
 from al_pipeline.features import sequence_featurizer as sf
+from sklearn.preprocessing import StandardScaler, PowerTransformer
+from al_pipeline.features.data_preprocessing import load_dataset
+from al_pipeline.models.gpr_model import MultitaskGPRegressionModel
 from pygmo import hypervolume
 from .utils import (
     AA2num,
